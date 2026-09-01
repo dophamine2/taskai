@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-title" content="Tutor">
+  <title>Tutor</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <style>
+    :root {
+      --font-d: 'Unbounded', sans-serif;
+      --font: 'Manrope', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
+
+    body {
+      background: #F5F6FA;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 16px 40px;
+      color: #111;
+    }
+
+    header {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 0;
+      margin-bottom: 20px;
+    }
+
+    .logo { font-size: 20px; font-weight: 800; color: #111; letter-spacing: -0.5px; font-family: var(--font-d); }
+    
+    .settings-icon {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #EAEAF2;
+      color: #7B61FF;
+      cursor: pointer;
+    }
+
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 16px;
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 10px;
+      border: 1px solid #EAEAF2;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary { background: #7B61FF; color: #fff; }
+    .btn-secondary { background: #F0EDFF; color: #7B61FF; display: block; }
+
+    .status {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 30px 20px;
+      width: 100%;
+      max-width: 400px;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #EAEAF2;
+      border-top-color: #7B61FF;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-text { display: none; }
+
+    .result-card {
+      display: none;
+      background: #fff;
+      border-radius: 16px;
+      padding: 16px 16px 12px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+      border: 1px solid #EAEAF2;
+      position: relative;
+    }
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .result-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #7B61FF;
+    }
+    
+    .result-cost {
+      font-size: 11px;
+      color: #999;
+      margin-top: 8px;
+      text-align: right;
+    }
+    .result-text {
+      font-size: 15px;
+      line-height: 1.6;
+      color: #111;
+      white-space: pre-wrap;
+    }
+
+    .tasks-list { display:none; flex-direction:column; gap:12px; width:100%; max-width:400px; margin-top:10px; }
+    .task-card {
+      background:#fff;
+      border-radius:16px;
+      padding:16px 16px 12px;
+      border:1px solid #EAEAF2;
+      position:relative;
+      box-shadow:0 4px 16px rgba(0,0,0,0.03);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .task-num {
+      font-size:13px;
+      font-weight:700;
+      color:#7B61FF;
+    }
+    .task-text {
+      font-size:15px;
+      line-height:1.6;
+      color:#111;
+      white-space:pre-wrap;
+    }
+
+    .error-card {
+      display: none;
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #FFEEEE;
+      margin-top: 10px;
+    }
+    .error-text { font-size: 14px; color: #FF453A; line-height: 1.5; font-weight: 500; }
+
+
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 20px 20px 0 0;
+      padding: 28px 20px 40px;
+      width: 100%;
+      max-width: 400px;
+    }
+    .modal-title { font-size: 18px; font-weight: 800; font-family: var(--font-d); margin-bottom: 20px; }
+    .modal-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #EAEAF2; font-size: 15px; }
+    .modal-row:last-child { border-bottom: none; }
+    .modal-val { color: #7B61FF; font-weight: 600; }
+    .modal-close { width: 100%; padding: 14px; background: #F0EDFF; color: #7B61FF; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 20px; font-family: var(--font); }
+
+    #photoScreen { display:flex; flex-direction:column; align-items:center; width:100%; }
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraph.css">
+  <script src="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraphcore.js"></script>
+  <style>
+    #geoBoard { width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden; margin-top:12px; display:none; background:#fff; border:1.5px solid #EAEAF2; }
+    .jxgbox { border-radius:12px !important; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="https://dophamine2.github.io/taskai/" style="text-decoration:none;color:inherit;display:flex;align-items:baseline;gap:5px"><div class="logo">Tutor</div><span style="font-size:11px;color:#bbb;font-family:var(--font);font-weight:500">v57</span></a>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button id="modelBtn" onclick="toggleModel()" style="padding:4px 10px;border-radius:8px;border:1px solid #EAEAF2;background:#FFF3E0;color:#F57C00;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">Flash</button>
+      <div class="settings-icon" onclick="openSettingsForTab()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </div>
+    </div>
+  </header>
+
+  <div id="photoScreen">
+
+  <input type="file" accept="image/*" capture="environment" id="camera" style="display:none" onchange="handlePhoto(this)">
+  <input type="file" accept="image/*" multiple id="gallery" style="display:none" onchange="handlePhoto(this)">
+
+  <div class="card">
+    <button class="btn btn-primary" id="shootBtn" onclick="document.getElementById('camera').click()">Сфотографировать задачу</button>
+    <button class="btn btn-secondary" id="galleryBtn" onclick="document.getElementById('gallery').click()">Загрузить из галереи</button>
+    <button class="btn btn-primary" id="againBtn" onclick="document.getElementById('camera').click()" style="display:none">Сфотографировать заново</button>
+    <button class="btn btn-secondary" id="galleryBtn2" onclick="document.getElementById('gallery').click()" style="display:none">Загрузить из галереи</button>
+    <button class="btn" id="savePhotoBtn" onclick="savePhoto()" style="display:none;background:#FFF3E0;color:#F57C00;font-weight:600">Скачать фото</button>
+    <div id="voiceGroup" style="display:none;gap:8px">
+      <button class="btn" id="voiceBtn" onclick="toggleVoice()" style="flex:1;background:#E8F5E9;color:#2E7D32;font-weight:600">
+        <span id="voiceBtnText">Голосовой ввод</span>
+      </button>
+      <button id="voiceCancelBtn" onclick="cancelVoice()" style="display:none;padding:16px 18px;border:none;border-radius:12px;background:#FFE0E0;color:#FF453A;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Остановить</button>
+    </div>
+    <div id="voiceRecognizedText" style="display:none;font-size:12px;color:#999;padding:6px 2px 0;word-break:break-word;line-height:1.4"></div>
+  </div>
+
+  <div class="status" id="status">
+    <div class="spinner"></div>
+    <span class="status-text" id="statusText">Анализирую...</span>
+  </div>
+
+  <div id="resultHeader" style="display:none;width:100%;max-width:400px;margin-bottom:10px">
+    <div style="display:flex;gap:8px">
+      <button onclick="resendToWatch()" id="resultResendBtn" style="flex:1;padding:14px;border:none;border-radius:12px;background:#7B61FF;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);display:none">Отправить</button>
+      <button onclick="regenerate()" id="regenBtn" style="flex:1;padding:14px;border:none;border-radius:12px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Заново</button>
+    </div>
+  </div>
+  <div class="result-card" id="resultCard" style="position:relative">
+    <div class="result-label" style="margin-bottom:10px">Ответ</div>
+    <div class="result-text" id="resultText"></div>
+    <div id="geoBoard"></div>
+    <div class="result-cost" id="resultCost"></div>
+  </div>
+
+  <div id="tasksHeader" style="display:none;width:100%;max-width:400px;margin-top:10px;margin-bottom:10px">
+    <div id="taskBtnsBar" style="display:flex;gap:8px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="autoSendAllTasks(lastTasks)" style="flex:1;padding:14px;border:none;border-radius:12px;background:#7B61FF;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Отправить все</button>
+      <button onclick="regenerate()" style="padding:14px 18px;border:none;border-radius:12px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Заново</button>
+    </div>
+  </div>
+  <div class="tasks-list" id="tasksList"></div>
+
+  <div class="error-card" id="errorCard">
+    <div class="result-header">
+      <div class="result-label">Ошибка</div>
+      <button onclick="regenerate()" title="Повторить" style="width:28px;height:28px;border-radius:50%;border:none;background:#F0EDFF;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#7B61FF;flex-shrink:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+      </button>
+    </div>
+    <div class="error-text" id="errorText"></div>
+  </div>
+  </div>
+
+  <select class="model-select" id="modelSelect" onchange="onModelChange(this.value)" style="display:none">
+    <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+    <option value="google/gemini-3.5-flash" selected>Gemini 3.5 Flash</option>
+  </select>
+  <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
+    <div class="modal">
+      <div class="modal-title">Настройки</div>
+      <div class="modal-row">
+        <span>Предмет</span>
+        <select id="subjectSelect" onchange="switchSubject(this.value)" style="padding:6px 12px;border-radius:8px;border:1px solid #EAEAF2;background:#F8F9FB;color:#111;font-size:14px;font-weight:600;font-family:var(--font);outline:none;cursor:pointer;text-align:center;text-align-last:center">
+          <option value="other" selected>Другое</option>
+          <option value="society">Обществознание</option>
+          <option value="algebra">Алгебра</option>
+          <option value="geometry">Геометрия</option>
+          <option value="probability">Вероятность</option>
+          <option value="physics">Физика</option>
+          <option value="history">История</option>
+          <option value="russian">Русский</option>
+        </select>
+      </div>
+      <div class="modal-row" id="micRow" style="display:none">
+        <span>Микрофон</span>
+        <select id="micSelect" onchange="onMicChange(this.value)" style="padding:6px 12px;border-radius:8px;border:1px solid #EAEAF2;background:#F8F9FB;color:#111;font-size:14px;font-weight:600;font-family:var(--font);outline:none;cursor:pointer;max-width:180px"></select>
+      </div>
+      <div class="modal-row">
+        <span>Уведомления</span>
+        <button id="notifBtn" onclick="requestNotifPermission()" style="padding:6px 18px;border-radius:8px;border:none;background:#F0EDFF;color:#7B61FF;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">Вкл</button>
+      </div>
+      <div class="modal-row" style="flex-direction:column;align-items:stretch;gap:8px">
+        <span>Ключи API (JSON)</span>
+        <textarea id="keysInput" rows="5" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder='{
+  "polza": "pza_...",
+  "google": "AQ..."
+}' style="padding:9px 12px;border-radius:8px;border:1px solid #EAEAF2;background:#F8F9FB;color:#111;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;outline:none;width:100%;box-sizing:border-box;resize:vertical"></textarea>
+        <button onclick="saveApiKeys()" style="padding:9px 18px;border-radius:8px;border:none;background:#F0EDFF;color:#7B61FF;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">Сохранить ключи</button>
+        <span id="keysStatus" style="font-size:12px;color:#999;line-height:1.4"></span>
+      </div>
+      <button class="modal-close" onclick="document.getElementById('settingsModal').classList.remove('open')">Готово</button>
+    </div>
+  </div>
+
+
+  <script>
+    // Бекэнда больше нет: страница ходит в Polza и Google сама. Ключи поэтому лежат
+    // только в localStorage этого устройства — в исходнике страницы их нет, и публичный
+    // репозиторий на GitHub Pages не выдаёт ничего, что можно было бы утащить сканером.
+    const KEYS_STORAGE = 'tutorApiKeys'
+    let apiKeys = { polza: '', google: '' }
+
+    function loadApiKeys() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(KEYS_STORAGE) || '{}')
+        apiKeys = { polza: saved.polza || '', google: saved.google || '' }
+      } catch { apiKeys = { polza: '', google: '' } }
+      const box = document.getElementById('keysInput')
+      if (box) box.value = (apiKeys.polza || apiKeys.google) ? JSON.stringify(apiKeys, null, 2) : ''
+      updateKeysStatus()
+    }
+
+    // Имя ключа принимаем в любом привычном написании — и короткое, и такое же, как
+    // в переменных окружения сервера, чтобы можно было вставить что под рукой.
+    function pickKey(obj, names) {
+      for (const name of names) {
+        const found = Object.keys(obj).find(k => k.toLowerCase().replace(/[-\s]/g, '_') === name)
+        if (found && typeof obj[found] === 'string' && obj[found].trim()) return obj[found].trim()
+      }
+      return ''
+    }
+
+    function saveApiKeys() {
+      const el = document.getElementById('keysStatus')
+      const raw = document.getElementById('keysInput').value.trim()
+      if (!raw) {
+        apiKeys = { polza: '', google: '' }
+        try { localStorage.removeItem(KEYS_STORAGE) } catch {}
+        updateKeysStatus()
+        return
+      }
+      let parsed
+      try { parsed = JSON.parse(raw) } catch (e) {
+        el.textContent = 'Это не JSON: ' + e.message
+        return
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        el.textContent = 'Ожидается объект вида {"polza": "...", "google": "..."}'
+        return
+      }
+      apiKeys = {
+        polza: pickKey(parsed, ['polza', 'polza_api_key', 'polzakey', 'polza_key']),
+        google: pickKey(parsed, ['google', 'google_api_key', 'googlekey', 'google_key', 'gemini'])
+      }
+      try { localStorage.setItem(KEYS_STORAGE, JSON.stringify(apiKeys)) } catch {}
+      updateKeysStatus()
+    }
+
+    function updateKeysStatus() {
+      const el = document.getElementById('keysStatus')
+      if (!el) return
+      // Google-ключ здесь необязателен: распознавание речи идёт через сервер, где ключ
+      // уже прописан. В браузере нужен только Polza — им оплачиваются и фото, и ответы.
+      el.textContent = apiKeys.polza ? 'Ключ Polza сохранён' : 'Нет ключа Polza'
+    }
+
+    window.addEventListener('load', () => {
+      document.getElementById('settingsModal').classList.add('open')
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js')
+      updateNotifBtn()
+      loadApiKeys()
+      // Эталон чистого экрана: с него начинается любой предмет, открытый впервые.
+      pristineView = captureSubjectView()
+    })
+
+
+    function updateNotifBtn() {
+      const btn = document.getElementById('notifBtn')
+      if (!('Notification' in window)) { btn.parentElement.style.display = 'none'; return }
+      if (Notification.permission === 'granted') {
+        btn.textContent = 'Вкл'; btn.style.background = '#E8F5E9'; btn.style.color = '#2E7D32'; btn.disabled = true
+      } else if (Notification.permission === 'denied') {
+        btn.textContent = 'Заблокировано'; btn.style.background = '#FFE0E0'; btn.style.color = '#FF453A'; btn.disabled = true
+      } else {
+        btn.textContent = 'Вкл'; btn.style.background = '#F0EDFF'; btn.style.color = '#7B61FF'; btn.disabled = false
+      }
+    }
+
+    function requestNotifPermission() {
+      if ('Notification' in window) {
+        Notification.requestPermission().then(updateNotifBtn)
+      }
+    }
+
+    // Часы Hoco Y1 рисуют пустой квадрат вместо большинства математических знаков.
+    // Проверено на устройстве: греческий алфавит целиком, степени ¹ ² ³, знаки ± × ° ·
+    // и дроби ½ ¼ ¾ выводятся нормально. Индексы, корни, суммы, интегралы, знаки
+    // сравнения, стрелки, множества и остальные степени — нет.
+    // Поэтому перед отправкой на часы переписываем непечатаемое обычными символами.
+    const WATCH_CHAR_MAP = {
+      '₀': '_0', '₁': '_1', '₂': '_2', '₃': '_3', '₄': '_4', '₅': '_5', '₆': '_6', '₇': '_7', '₈': '_8', '₉': '_9',
+      'ₙ': '_n', 'ₓ': '_x', 'ᵢ': '_i', 'ⱼ': '_j', 'ₖ': '_k', 'ₐ': '_a', '₊': '_+', '₋': '_-',
+      '⁰': '^0', '⁴': '^4', '⁵': '^5', '⁶': '^6', '⁷': '^7', '⁸': '^8', '⁹': '^9', 'ⁿ': '^n', '⁺': '^+', '⁻': '^-',
+      '√': 'кр', '∛': 'куб.кр', '∑': 'сумма', '∏': 'произв', '∫': 'интеграл', '∂': 'd', '∇': 'набла',
+      '≤': '<=', '≥': '>=', '≠': '!=', '≈': '~', '≡': '=', '≅': '~=', '∝': 'проп', '≪': '<<', '≫': '>>',
+      '→': '->', '←': '<-', '↔': '<->', '⇒': '=>', '⇐': '<=', '⇔': '<=>', '↑': 'вверх', '↓': 'вниз', '⇌': '<->',
+      '∈': ' прин ', '∉': ' не прин ', '⊂': ' подмн ', '⊃': ' надмн ', '∪': ' U ', '∩': ' пересеч ',
+      '∅': 'пусто', '∞': 'беск', '∀': 'для любого ', '∃': 'существует ', '¬': 'не ', '∧': ' и ', '∨': ' или ',
+      'ℕ': 'N', 'ℤ': 'Z', 'ℝ': 'R', 'ℂ': 'C', 'ℚ': 'Q',
+      '⅓': '1/3', '⅔': '2/3', '⅕': '1/5', '⅖': '2/5', '⅗': '3/5', '⅘': '4/5', '⅙': '1/6', '⅚': '5/6',
+      '⅐': '1/7', '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8', '⅑': '1/9', '⅒': '1/10',
+      '∠': 'угол ', '⊥': ' перп ', '∥': ' парал ', 'ℏ': 'h', 'ℓ': 'l', '∆': 'дельта', '∡': 'угол ',
+      '−': '-', '–': '-', '—': '-', '⋅': '·', '∙': '·', '•': '·', '÷': ':', '∘': '°',
+      '′': "'", '″': '"', '…': '...', ' ': ' ', ' ': ' ', ' ': ' '
+    }
+    // Всё, что часы точно умеют: латиница, кириллица, греческий, цифры, обычная
+    // пунктуация и проверенные на устройстве символы. Остальное выкидываем — пустой
+    // квадрат в ответе хуже, чем его отсутствие.
+    const WATCH_SAFE_RE = /[A-Za-zͰ-ϿЀ-ӿ0-9\s.,:;!?()\[\]{}<>+\-*\/=%'"«»№#&@_|\\~^$±×½¼¾°·¹²³]/
+
+    function toWatchText(text) {
+      let out = ''
+      for (const ch of text) {
+        const mapped = WATCH_CHAR_MAP[ch]
+        if (mapped !== undefined) { out += mapped; continue }
+        if (WATCH_SAFE_RE.test(ch)) { out += ch; continue }
+        // Математический алфавит (𝑥, 𝐀, 𝟏) приводим к обычным буквам и цифрам:
+        // иначе из выражения молча пропадают все переменные.
+        const code = ch.codePointAt(0)
+        if (code >= 0x1D400 && code <= 0x1D7FF) {
+          const plain = ch.normalize('NFKD')
+          if (WATCH_SAFE_RE.test(plain)) out += plain
+        }
+      }
+      return out.replace(/ {2,}/g, ' ')
+    }
+
+    function browserNotify(title, body) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return
+      // Звёздочку умножения переводим в · ДО вырезания markdown: иначе следующая строка
+      // съедала её вместе с разметкой, и на часы приходило «0,3 0,02» вместо «0,3 · 0,02».
+      // Точка-оператор часами поддерживается и заодно привычнее в записи от руки.
+      // Умножение отличаем от markdown по симметрии пробелов: у «5 * 3» и «m*a» они
+      // одинаковые с обеих сторон, а у курсива «*слово*» — нет. Просмотр вперёд (?=)
+      // не съедает следующий символ, иначе в цепочке «a * b * c» терялась средняя звёздочка.
+      const withMul = body
+        .replace(/([\d)a-zA-Zа-яА-Я]) \* (?=[\d(a-zA-Zа-яА-Я])/g, '$1 · ')
+        .replace(/([\d)a-zA-Zа-яА-Я])\*(?=[\d(a-zA-Zа-яА-Я])/g, '$1·')
+      let text = toWatchText(withMul.replace(/\*\*/g, '').replace(/\*/g, '').replace(/#{1,6}\s/g, '').trim())
+      const CHUNK = 200
+      const chunks = []
+      while (text.length > 0) {
+        let end = Math.min(CHUNK, text.length)
+        if (end < text.length) {
+          const ln = text.lastIndexOf('\n', end)
+          const ls = text.lastIndexOf(' ', end)
+          end = ln > 0 ? ln : ls > 0 ? ls : end
+        }
+        chunks.push(text.substring(0, end).trim())
+        text = text.substring(end).trim()
+      }
+      chunks.forEach((chunk, i) => {
+        setTimeout(() => {
+          try { new Notification(title, { body: chunk, silent: i > 0 }) } catch {}
+        }, i * 500)
+      })
+    }
+
+    // Единая точка обращения к Polza — раньше этим занимался server.ts.
+    async function callPolza(body, timeoutMs) {
+      if (!apiKeys.polza) return { ok: false, error: 'Не задан ключ Polza — открой настройки' }
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+      try {
+        const res = await fetch('https://polza.ai/api/v1/chat/completions', {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKeys.polza },
+          body: JSON.stringify(body)
+        })
+        clearTimeout(timer)
+        const raw = await res.text()
+        let data
+        try { data = JSON.parse(raw) } catch { return { ok: false, error: 'Не JSON: ' + raw.substring(0, 200) } }
+        if (!res.ok) return { ok: false, error: 'HTTP ' + res.status + (data?.error?.message ? ': ' + data.error.message : '') }
+        const answer = data.choices?.[0]?.message?.content || ''
+        if (!answer.trim()) return { ok: false, error: 'Пустой ответ. Finish: ' + (data.choices?.[0]?.finish_reason || '?') }
+        return { ok: true, answer, usage: data.usage ?? null, cost: data.cost ?? data.price ?? null }
+      } catch (e) {
+        clearTimeout(timer)
+        return { ok: false, error: e.name === 'AbortError' ? 'Превышено время ожидания' : e.message }
+      }
+    }
+
+    // Разбор фото. Повторяем запрос один раз, а для pro-модели после второй неудачи
+    // падаем на flash — ровно как делал сервер.
+    // Polza резервирует деньги под весь max_tokens заранее, ещё до генерации: при
+    // нехватке баланса вернётся 402 «Недостаточно средств». Если такое увидишь —
+    // это про счёт, а не про код.
+    const PHOTO_MAX_TOKENS = 16382
+
+    async function analyzePhotos(images) {
+      const build = (model) => ({
+        model,
+        max_tokens: PHOTO_MAX_TOKENS,
+        temperature: 0.1,
+        ...(model.startsWith('google/')
+          ? { provider: { only: ['Google AI Studio'], allow_fallbacks: false }, reasoning: { effort: 'high' }, include_reasoning: false }
+          : {}),
+        messages: [{
+          role: 'user',
+          content: [
+            ...images.map(img => ({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + img } })),
+            { type: 'text', text: PROMPTS[currentSubject] }
+          ]
+        }]
+      })
+      let usedModel = currentModel
+      let result = await callPolza(build(usedModel), 200000)
+      if (!result.ok) {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        result = await callPolza(build(usedModel), 200000)
+      }
+      if (!result.ok && usedModel.includes('pro')) {
+        usedModel = 'google/gemini-3.5-flash'
+        result = await callPolza(build(usedModel), 200000)
+      }
+      return { ...result, model: usedModel }
+    }
+
+    const PROMPTS = {
+      probability: 'Реши задания по теории вероятностей из ЕГЭ, профильная математика (задания 4 и 5). Пиши обычным текстом, без markdown и LaTeX: умножение обозначай точкой ·, степень — буквой в (0,8в4), сочетания C(5,3), факториал 5!. События обозначай ТОЛЬКО буквами A, B, C, D, F: P(A), P(B), P(C). Больше НИКАКИХ буквенных обозначений не вводи — ни n, ни m, ни p, ни q, ни k, ни H1: любую величину называй словами с числом («всего исходов - 8», «благоприятных - 3», «красных шаров - 5», «вероятность попадания - 0,8»). Курс 10-11 класса, профиль: классическое определение вероятности, комбинаторика, теоремы сложения и умножения, независимые и несовместные события, противоположное событие, условная вероятность, формула полной вероятности, схема Бернулли. Ничего сверх этого. Оформляй как образцовое решение из сборника, 3-5 строк на задачу. Первая строка — «P(A) - краткое описание события словами по условию». Вторая — данные словами с числами через запятую. Третья — вычисление: подставляй числа сразу, без буквенных формул, а каждое сочетание ОБЯЗАТЕЛЬНО расписывай через факториалы, C(5,4) = 5!/(4!·1!) = 5, в схеме Бернулли особенно, за пропуск снижают баллы. Последняя строка — «Ответ: число». Это описание структуры, а не нумерация: не печатай в ответе «1)», «2)» и подобные пометки. В каждой задаче обозначения начинаются заново, первое событие всегда A. Обыкновенную дробь ОБЯЗАТЕЛЬНО сокращай до конца, пока она не станет несократимой: 10/455 = 2/91, а не 10/455. Ответ — целое число или десятичная дробь с запятой; если деление даёт бесконечную дробь, оставь несократимую обыкновенную. Округляй только если этого требует условие. Условие не переписывай. Без оборотов «применим теорему» и «отсюда следует». Первая строка: TASKS:[кол-во]. Пустая строка между задачами. Без вступлений и без рассуждений о формате.',
+      algebra: 'Реши задания на фото. Никакого LaTeX, markdown. Степень — в (xв2), корень — кр, деление — :, умножение — *. Производная начинается с y` =. Первая строка: TASKS:[кол-во]. Пустая строка между задачами. Без вступлений.',
+      geometry: 'Реши задания на фото. Никакого LaTeX, markdown. Степень — в (xв2), корень — кр, деление — :, умножение — *. Формат каждой задачи: Дано / Решение / Ответ. Первая строка: TASKS:[кол-во]. Пустая строка между задачами. Без вступлений.',
+      physics: 'Реши задания на фото. Никакого LaTeX, markdown. Степень — в (xв2), корень — кр, деление — :, умножение — *, СИ. Формат каждой задачи: Дано / Найти / Решение / Ответ. Первая строка: TASKS:[кол-во]. Пустая строка между задачами. Без вступлений.',
+      history: 'Реши задания на фото. ТОЛЬКО краткий ответ: цифры, даты или фамилии. Формат: "1. ответ" на каждой строке. Сопоставление: только цифры слитно (пример: "5. 3142"). Никаких букв A,Б,В — только цифры. Никаких пояснений.',
+      russian: 'Реши задание на фото. Без вступлений. Только ответ.',
+      society: 'Обществознание. ТОЛЬКО краткий ответ: цифры или слова. Формат: "1. ответ" на каждой строке. Сопоставление: только цифры слитно ("5. 3142"). Никаких букв A,Б,В. Макс 3-5 слов. Никаких пояснений.',
+      other: 'Реши задание на фото. Без вступлений. Только ответ.',
+    }
+
+    let geoBoard = null
+
+    function renderFigure(figJson) {
+      const el = document.getElementById('geoBoard')
+      if (!figJson) { el.style.display = 'none'; return }
+      try {
+        const fig = typeof figJson === 'string' ? JSON.parse(figJson) : figJson
+        el.style.display = 'block'
+        el.innerHTML = ''
+        el.id = 'geoBoard'
+        if (geoBoard) { try { JXG.JSXGraph.freeBoard(geoBoard) } catch {} }
+
+        // Вычислим bounding box по точкам
+        const pts = Object.values(fig.points || {})
+        const circles = fig.circles || []
+        let xs = pts.map(p => p[0])
+        let ys = pts.map(p => p[1])
+        circles.forEach(c => {
+          const cp = fig.points[c.center] || [0,0]
+          xs.push(cp[0]-c.radius, cp[0]+c.radius)
+          ys.push(cp[1]-c.radius, cp[1]+c.radius)
+        })
+        if (!xs.length) { xs = [-5,5]; ys = [-5,5] }
+        const pad = 1.5
+        const minX = Math.min(...xs)-pad, maxX = Math.max(...xs)+pad
+        const minY = Math.min(...ys)-pad, maxY = Math.max(...ys)+pad
+
+        geoBoard = JXG.JSXGraph.initBoard('geoBoard', {
+          boundingbox: [minX, maxY, maxX, minY],
+          axis: false, grid: false, showNavigation: false, showCopyright: false,
+          pan: { enabled: false }, zoom: { enabled: false }
+        })
+
+        // Точки
+        const jxPts = {}
+        for (const [name, coord] of Object.entries(fig.points || {})) {
+          jxPts[name] = geoBoard.create('point', coord, {
+            name, size: 3, fixed: true,
+            label: { fontSize: 14, fontWeight: 'bold', color: '#111' },
+            color: '#7B61FF', strokeColor: '#7B61FF', fillColor: '#7B61FF'
+          })
+        }
+
+        // Видимые отрезки
+        for (const seg of (fig.segments || [])) {
+          const [a, b] = seg
+          if (jxPts[a] && jxPts[b]) {
+            geoBoard.create('segment', [jxPts[a], jxPts[b]], {
+              strokeColor: '#222', strokeWidth: 2
+            })
+          }
+        }
+
+        // Скрытые рёбра (пунктир)
+        for (const seg of (fig.hidden_segments || [])) {
+          const [a, b] = seg
+          if (jxPts[a] && jxPts[b]) {
+            geoBoard.create('segment', [jxPts[a], jxPts[b]], {
+              strokeColor: '#888', strokeWidth: 1.5, dash: 2
+            })
+          }
+        }
+
+        // Окружности
+        for (const c of circles) {
+          const cp = jxPts[c.center]
+          if (cp) {
+            geoBoard.create('circle', [cp, c.radius], {
+              strokeColor: '#7B61FF', strokeWidth: 2, fillColor: 'none'
+            })
+          }
+        }
+
+      } catch(e) {
+        document.getElementById('geoBoard').style.display = 'none'
+      }
+    }
+
+    function parseAndRenderGeometry(rawAnswer) {
+      const match = rawAnswer.match(/FIGURE_JSON:(\{[\s\S]*\})\s*$/)
+      if (!match) { renderFigure(null); return rawAnswer }
+      try {
+        const fig = JSON.parse(match[1])
+        renderFigure(fig)
+      } catch { renderFigure(null) }
+      return rawAnswer.replace(/FIGURE_JSON:[\s\S]*$/, '').trim()
+    }
+
+    let currentSubject = 'other'
+    let currentModel = 'google/gemini-3.5-flash'
+
+    function openSettingsForTab() {
+      document.getElementById('settingsModal').classList.add('open')
+    }
+
+    function onModelChange(val) {
+      currentModel = val
+      updateModelBtn()
+    }
+
+    function toggleModel() {
+      const isPro = currentModel === 'google/gemini-3.1-pro-preview'
+      currentModel = isPro ? 'google/gemini-3.5-flash' : 'google/gemini-3.1-pro-preview'
+      document.getElementById('modelSelect').value = currentModel
+      updateModelBtn()
+    }
+
+    function updateModelBtn() {
+      const btn = document.getElementById('modelBtn')
+      const isPro = currentModel === 'google/gemini-3.1-pro-preview'
+      btn.textContent = isPro ? 'Pro' : 'Flash'
+      btn.style.background = isPro ? '#F0EDFF' : '#FFF3E0'
+      btn.style.color = isPro ? '#7B61FF' : '#F57C00'
+    }
+
+
+    function closeSettings(e) {
+      if (e.target === document.getElementById('settingsModal')) {
+        document.getElementById('settingsModal').classList.remove('open')
+      }
+    }
+
+    function savePhoto() {
+      if (!lastPhotoUrl) return
+      const a = document.createElement('a')
+      a.href = lastPhotoUrl
+      a.download = 'tutor-' + Date.now() + '.jpg'
+      a.click()
+    }
+
+
+    function autoModelForSubject() {
+      if (currentSubject === 'history') {
+        currentModel = 'google/gemini-3.5-flash'
+        document.getElementById('modelSelect').value = currentModel
+        updateModelBtn()
+      }
+    }
+
+    function updateVoiceBtn() {
+      const isHistory = currentSubject === 'history'
+      // Ушли с истории на другой предмет — глушим микрофон. Иначе запись продолжается,
+      // ответы падают в список, а кнопки «Остановить» на экране уже нет.
+      if (!isHistory && (continuousActive || voiceStarting)) stopContinuousVoice()
+      document.getElementById('voiceGroup').style.display = isHistory ? 'flex' : 'none'
+    }
+
+    // Голосовой режим для истории: настоящий real-time через Gemini Live API (WebSocket).
+    // Микрофон льётся непрерывным потоком сырого PCM (AudioWorklet сам ресемплит до 16кГц)
+    // на наш сервер, а он пересылает поток в Google: напрямую из браузера Google отказывает
+    // по региону. Конец фразы определяет Google своим VAD, распознанный текст возвращается
+    // сюда, и уже отсюда уходит в Polza за ответом — без промежуточных хопов.
+    const MIC_STORAGE_KEY = 'tutorPreferredMic'
+    // Google иногда финализирует одну фразу несколькими кусками подряд. Склеиваем их,
+    // если пришли почти вплотную. Пауза прибавляется к каждому ответу, поэтому короткая.
+    const TRANSCRIPT_GAP_MS = 250
+    // Урок — непрерывная речь, а ответ идёт секунды. Очередь держим короткой и
+    // выбрасываем протухшее: ответ на фразу пятиминутной давности уроку не нужен.
+    const MAX_PENDING_PHRASES = 2
+    const PHRASE_STALE_MS = 15 * 1000
+    const HISTORY_MAX = 3
+    const RELAY_RECONNECT_BASE_MS = 500
+    const RELAY_RECONNECT_MAX_MS = 8000
+    const RELAY_MAX_FAILS = 6
+
+    const VOICE_ANSWER_PROMPT_PREFIX = `Контекст: идёт УРОК ИСТОРИИ. Ты слушаешь непрерывную речь учителя, распознанную в реальном времени, — это в основном ОБЪЯСНЕНИЕ материала, а не вопросы. Отвечай ТОЛЬКО на то, что задано классу как вопрос или просьба.
+
+Решай по ФОРМЕ фразы, а не по теме. То, что фраза историческая, само по себе НЕ повод отвечать: на уроке истории исторично всё.
+
+ОТВЕЧАЙ, если фраза — одно из:
+1. Вопрос: есть вопросительное слово (кто, что, когда, где, почему, зачем, какой, сколько, чей) или вопросительный порядок слов ("был ли", "правда ли, что").
+2. Задание классу: "назовите", "перечислите", "объясните", "расскажите про", "вспомните", "дайте определение", "кто скажет", "кто помнит", "кто ответит".
+3. Короткая (до 6 слов) именная фраза без сказуемого, похожая на запрос: "столица древней руси", "год смерти ивана грозного".
+4. Уточнение к твоему предыдущему ответу: "а почему", "а дальше", "а точнее".
+
+SKIP, если фраза — что угодно из:
+- Повествование или диктовка: законченное утверждение, сообщающее факт ("в 1861 году отменили крепостное право", "Пётр I основал Петербург"). Это объяснение учителя. Даже если тема историческая — SKIP.
+- Оргвопросы урока: "откройте учебник", "запишите тему", "проверим домашнее задание".
+- Бытовой разговор, реплики учеников, обрывки без смысла, другой предмет.
+- Риторический вопрос внутри объяснения, на который учитель тут же отвечает сам ("и что мы видим? мы видим кризис").
+
+Если сомневаешься между "вопрос" и "утверждение" — выбирай SKIP. Один пропущенный вопрос лучше, чем поток ответов на объяснение.
+
+Формат ответа: МАКСИМАЛЬНО коротко, только суть (дата/имя/название/факт), без вступлений и пояснений. Пример: "в каком году было Крещение Руси" → "988 год".
+
+Когда не отвечаешь — ровно одно слово: SKIP, без пояснений и знаков препинания.
+
+`
+    // Порог тишины экономит трафик (16кГц PCM в base64 — это ~2.6 МБ в минуту, ~115 МБ
+    // за урок) и не даёт слать в Google пустой класс. Если вдруг перестанет слышать
+    // тихого учителя — выключается здесь, одной строкой.
+    const VOICE_SILENCE_GATE = true
+    // Хвост после последней речи шлём обязательно: по нему Google понимает,
+    // что фраза закончилась, и отдаёт финальную расшифровку.
+    const VOICE_GATE_HANGOVER_SEC = 2.0
+
+    // Учитель в нескольких метрах от телефона. Браузерная обработка по умолчанию
+    // откалибрована под речь у самого микрофона: шумодав принимает дальнее поле за шум
+    // и режет его, эхоподавление здесь бесполезно. Усиление, наоборот, оставляем.
+    function micConstraints(deviceId) {
+      const base = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: true,
+        channelCount: 1
+      }
+      return deviceId ? { ...base, deviceId: { exact: deviceId } } : base
+    }
+    const PCM_WORKLET_CODE = `
+      class PCMProcessor extends AudioWorkletProcessor {
+        constructor() {
+          super()
+          this.ratio = sampleRate / 16000
+          this.readPos = 0
+          this.buffer = []
+          this.outBuf = []
+          // 512 сэмплов @16кГц = 32мс аудио в пакете. При 2048 каждая фраза начинала
+          // ехать в Google на 128мс позже, и на столько же позже приходил ответ.
+          this.chunkSize = 512
+          this.gate = ${VOICE_SILENCE_GATE}
+          this.hangover = ${VOICE_GATE_HANGOVER_SEC}
+          this.noiseFloor = 0.01
+          this.lastVoiceTime = -1e9
+          // Предзапись: держим последние отброшенные пакеты тишины и отдаём их первыми,
+          // когда началась речь. Иначе тихий заход в фразу («а вот скажите...») падал
+          // ниже порога и первое слово просто не доезжало до распознавания.
+          this.preroll = []
+          this.prerollMax = 4
+        }
+        emit(pcm) {
+          const int16 = new Int16Array(pcm.length)
+          for (let i = 0; i < pcm.length; i++) int16[i] = Math.round(pcm[i] * 32767)
+          this.port.postMessage(int16.buffer, [int16.buffer])
+        }
+        process(inputs) {
+          const channel = inputs[0] && inputs[0][0]
+          if (!channel) return true
+          for (let i = 0; i < channel.length; i++) this.buffer.push(channel[i])
+          while (this.readPos + 1 < this.buffer.length) {
+            const idx = Math.floor(this.readPos)
+            const frac = this.readPos - idx
+            const sample = this.buffer[idx] + (this.buffer[idx + 1] - this.buffer[idx]) * frac
+            this.outBuf.push(Math.max(-1, Math.min(1, sample)))
+            this.readPos += this.ratio
+          }
+          const consumed = Math.floor(this.readPos)
+          if (consumed > 0) { this.buffer = this.buffer.slice(consumed); this.readPos -= consumed }
+          if (this.outBuf.length >= this.chunkSize) {
+            const pcm = this.outBuf.splice(0, this.outBuf.length)
+            if (this.gate) {
+              let sum = 0
+              for (let i = 0; i < pcm.length; i++) sum += pcm[i] * pcm[i]
+              const rms = Math.sqrt(sum / pcm.length)
+              // Фон отслеживаем асимметрично: вниз быстро, вверх очень медленно, иначе
+              // сама речь подтянет порог за собой и учитель окажется "тишиной".
+              // Коэффициенты привязаны к длине пакета (32мс): постоянные времени те же
+              // ~1.3с вниз и ~26с вверх, что и при прежних 128мс.
+              this.noiseFloor = rms < this.noiseFloor
+                ? this.noiseFloor * 0.975 + rms * 0.025
+                : this.noiseFloor * 0.99875 + rms * 0.00125
+              if (rms > Math.max(0.002, this.noiseFloor * 2)) this.lastVoiceTime = currentTime
+              if (currentTime - this.lastVoiceTime > this.hangover) {
+                this.preroll.push(pcm)
+                if (this.preroll.length > this.prerollMax) this.preroll.shift()
+                return true
+              }
+              while (this.preroll.length) this.emit(this.preroll.shift())
+            }
+            this.emit(pcm)
+          }
+          return true
+        }
+      }
+      registerProcessor('pcm-processor', PCMProcessor)
+    `
+
+    let continuousActive = false
+    // Вкладка свёрнута: режим не выключен, но микрофон и сокет временно погашены.
+    // Отдельный флаг нужен, чтобы реконнект не поднимал соединение в фоне.
+    let voicePaused = false
+    let voiceStarting = false
+    // Номер попытки запуска: каждый stop/старт/восстановление увеличивает его, и любая
+    // асинхронная цепочка, начатая раньше, по несовпадению номера тихо сворачивается.
+    let voiceSession = 0
+    let voiceStream = null
+    let voiceWakeLock = null
+    let audioContext = null
+    let workletNode = null
+    let lastVoiceAnswer = ''
+
+    // Сокет к нашему ретранслятору распознавания и его переподключение.
+    let relaySocket = null
+    let relayReconnectTimer = null
+    let relayFails = 0
+    // Причина последнего обрыва со стороны Google — показываем её пользователю.
+    let lastCloseInfo = ''
+    // Склейка кусков расшифровки и очередь фраз на ответ.
+    let lastTranscript = ''
+    let pendingTranscript = ''
+    let transcriptTimer = null
+    let pendingPhrases = []
+    let answering = false
+    // Короткая память диалога на урок: переживает пересоздание сессии Google, нужна для
+    // уточняющих вопросов вроде "а почему?".
+    let conversationHistory = []
+
+    function setVoiceUiListening(on) {
+      document.getElementById('voiceBtnText').textContent = on ? 'Слушаю...' : 'Голосовой ввод'
+      document.getElementById('voiceBtn').style.background = on ? '#C62828' : '#E8F5E9'
+      document.getElementById('voiceBtn').style.color = on ? '#fff' : '#2E7D32'
+      document.getElementById('voiceCancelBtn').style.display = on ? 'block' : 'none'
+      const recognizedEl = document.getElementById('voiceRecognizedText')
+      recognizedEl.style.display = on ? 'block' : 'none'
+      if (!on) recognizedEl.textContent = ''
+    }
+
+    function showVoiceStatus(status) {
+      document.getElementById('voiceRecognizedText').textContent = status
+    }
+
+    async function acquireVoiceWakeLock() {
+      try { voiceWakeLock = await navigator.wakeLock.request('screen') } catch {}
+    }
+
+    function releaseVoiceWakeLock() {
+      if (voiceWakeLock) { try { voiceWakeLock.release() } catch {}; voiceWakeLock = null }
+    }
+
+    async function pickMicDeviceId() {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const mics = devices.filter(d => d.kind === 'audioinput')
+      const micSelect = document.getElementById('micSelect')
+      const micRow = document.getElementById('micRow')
+      if (mics.length > 1) {
+        micSelect.innerHTML = mics.map(m => `<option value="${m.deviceId}">${(m.label || 'Микрофон').replace(/</g, '&lt;')}</option>`).join('')
+        let saved = null
+        try { saved = localStorage.getItem(MIC_STORAGE_KEY) } catch {}
+        if (saved && mics.some(m => m.deviceId === saved)) micSelect.value = saved
+        micRow.style.display = 'flex'
+        return micSelect.value
+      }
+      micRow.style.display = 'none'
+      return mics[0]?.deviceId || null
+    }
+
+    function onMicChange(deviceId) {
+      try { localStorage.setItem(MIC_STORAGE_KEY, deviceId) } catch {}
+      if (continuousActive) { stopContinuousVoice(); startContinuousVoice() }
+    }
+
+    async function toggleVoice() {
+      if (continuousActive) { stopContinuousVoice(); return }
+      await startContinuousVoice()
+    }
+
+    function cancelVoice() {
+      stopContinuousVoice()
+    }
+
+    function giveUpContinuousVoice(reason) {
+      stopContinuousVoice()
+      document.getElementById('voiceBtnText').textContent = 'Нажмите, чтобы продолжить'
+      document.getElementById('voiceBtn').style.background = '#FFF3E0'
+      document.getElementById('voiceBtn').style.color = '#F57C00'
+      // Причину показываем ПОСЛЕ остановки: setVoiceUiListening(false) прячет и чистит
+      // строку статуса, поэтому написанное до вызова тут же пропадало.
+      if (reason) {
+        const el = document.getElementById('voiceRecognizedText')
+        el.style.display = 'block'
+        el.textContent = reason
+      }
+    }
+
+    function arrayBufferToBase64(buffer) {
+      let binary = ''
+      const bytes = new Uint8Array(buffer)
+      const chunkSize = 0x8000
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize))
+      }
+      return btoa(binary)
+    }
+
+    function finalizeVoiceAnswer(answer, heard, ms) {
+      // Сравниваем с последним ГОЛОСОВЫМ ответом, а не с общим lastAnswer: тот пишется ещё
+      // и разбором фото, и совпадение с ним молча съедало корректный ответ по речи.
+      if (answer === lastVoiceAnswer) { showVoiceStatus('Такой же ответ, как только что — пропускаю'); return }
+      // Время самого запроса к модели — чтобы было видно, где именно уходит задержка.
+      showVoiceStatus((ms ? 'Отвечено за ' + (ms / 1000).toFixed(1) + ' с: ' : 'Отвечено: ') + answer)
+      lastVoiceAnswer = answer
+      lastAnswer = answer
+      hide('errorCard')
+      hide('resultCard')
+      hide('resultHeader')
+      const list = document.getElementById('tasksList')
+      const card = document.createElement('div')
+      card.className = 'task-card'
+      // Показываем и распознанную фразу: в потоке карточек иначе не понять,
+      // на какой вопрос это ответ.
+      const heardLine = heard
+        ? `<div style="font-size:12px;color:#999;margin-bottom:6px;word-break:break-word;line-height:1.35">${heard.replace(/</g, '&lt;')}</div>`
+        : ''
+      card.innerHTML = heardLine + `<div class="task-text">${answer.replace(/</g, '&lt;')}</div>`
+      list.insertBefore(card, list.firstChild)
+      list.style.display = 'flex'
+      browserNotify('Tutor', answer)
+    }
+
+    // ===== Ответ на распознанную фразу =====
+
+    async function handleFinalTranscript(text) {
+      if (!continuousActive || text === lastTranscript) return
+      lastTranscript = text
+      const historyBlock = conversationHistory.length
+        ? 'Контекст предыдущих вопросов и ответов на этом уроке (используй, если текущая фраза — уточнение вроде "а почему?", "а что дальше?"):\n' +
+          conversationHistory.map((h, i) => `${i + 1}. Вопрос: ${h.q}\n   Ответ: ${h.a}`).join('\n') + '\n\n'
+        : ''
+      const startedAt = Date.now()
+      const result = await callPolza({
+        // Замеры на живом ключе, один и тот же промпт, медиана из трёх прогонов:
+        //   gemini-3.7-flash      7010 мс (разброс 2450–9599), 42 токена мыслей
+        //   gemini-3.6-flash      1298 мс, 0 мыслей
+        //   gemini-3.1-flash-lite 1442 мс, 0 мыслей, 12/12 верных решений
+        //   gemini-3.5-flash-lite 1105 мс, 0 мыслей, 12/12 верных решений  <- выбрана
+        // «Reasoning is mandatory» — ограничение конкретно 3.7-flash: остальные модели
+        // принимают minimal и не тратят на мысли ни одного токена.
+        // Для разбора фото модель НЕ менять: там нужна сильная, а не быстрая.
+        model: 'google/gemini-3.5-flash-lite',
+        max_tokens: 300,
+        temperature: 0.1,
+        provider: { only: ['Google AI Studio'], allow_fallbacks: false },
+        reasoning: { effort: 'minimal' },
+        include_reasoning: false,
+        messages: [{ role: 'user', content: [{ type: 'text', text: VOICE_ANSWER_PROMPT_PREFIX + historyBlock + 'Текущая фраза: ' + text }] }]
+      }, 20000)
+      const tookMs = Date.now() - startedAt
+      if (!result.ok || !result.answer) { showVoiceStatus('Ошибка: ' + (result.error || 'пустой ответ')); return }
+      const answer = result.answer.trim()
+      // Строгое сравнение с 'SKIP' пропускало «SKIP.» и «SKIP — бытовая фраза» прямо
+      // на экран как ответ. Смотрим на начало строки, игнорируя обрамление.
+      if (!answer || /^[\s"'«»*_>-]*SKIP\b/i.test(answer)) {
+        showVoiceStatus('Не вопрос: "' + text + '" — слушаю дальше')
+        return
+      }
+      conversationHistory.push({ q: text, a: answer })
+      if (conversationHistory.length > HISTORY_MAX) conversationHistory.shift()
+      finalizeVoiceAnswer(answer, text, tookMs)
+    }
+
+    function enqueuePhrase(text) {
+      pendingPhrases.push({ text, at: Date.now() })
+      // Если модель отстаёт от речи, копить бессмысленно — оставляем самые свежие фразы.
+      while (pendingPhrases.length > MAX_PENDING_PHRASES) pendingPhrases.shift()
+      drainPhrases()
+    }
+
+    async function drainPhrases() {
+      if (answering) return
+      answering = true
+      try {
+        while (continuousActive) {
+          const item = pendingPhrases.shift()
+          if (!item) break
+          if (Date.now() - item.at > PHRASE_STALE_MS) continue
+          try { await handleFinalTranscript(item.text) } catch { /* одна фраза не должна ронять очередь */ }
+        }
+      } finally {
+        answering = false
+      }
+    }
+
+    function queueFinalTranscript(text) {
+      pendingTranscript = pendingTranscript ? pendingTranscript + ' ' + text : text
+      if (transcriptTimer !== null) clearTimeout(transcriptTimer)
+      transcriptTimer = setTimeout(() => {
+        const combined = pendingTranscript.trim()
+        pendingTranscript = ''
+        transcriptTimer = null
+        if (combined) enqueuePhrase(combined)
+      }, TRANSCRIPT_GAP_MS)
+    }
+
+    // ===== Живая сессия распознавания =====
+    // Звук идёт не прямо в Google, а через наш сервер: Google отклоняет обращения к Gemini
+    // API из региона пользователя («User location is not supported for the API use»), и из
+    // браузера напрямую сессия не поднимается вообще. Сервер пересылает звук своим IP
+    // и возвращает распознанный текст. Ответ на вопрос при этом по-прежнему берётся из
+    // браузера напрямую у Polza — она из России доступна, и лишний хоп там стоил бы секунду.
+    const VOICE_RELAY = 'https://hungry-camel-14.zigzaktm.deno.net'
+
+    function closeRelaySocket() {
+      if (!relaySocket) return
+      const ws = relaySocket
+      relaySocket = null
+      try { ws.onclose = null; ws.onmessage = null; ws.onerror = null; ws.onopen = null; ws.close() } catch {}
+    }
+
+    function scheduleRelayReconnect() {
+      if (relayReconnectTimer !== null) return
+      relayFails++
+      if (relayFails > RELAY_MAX_FAILS) {
+        giveUpContinuousVoice('Распознавание недоступно' + lastCloseInfo + ' — проверь интернет')
+        return
+      }
+      showVoiceStatus('Связь потеряна' + lastCloseInfo + ', восстанавливаю...')
+      const delay = Math.min(RELAY_RECONNECT_BASE_MS * 2 ** (relayFails - 1), RELAY_RECONNECT_MAX_MS)
+      relayReconnectTimer = setTimeout(() => {
+        relayReconnectTimer = null
+        if (continuousActive && !voicePaused) connectRelay(true)
+      }, delay)
+    }
+
+    function connectRelay(afterFailure) {
+      const ws = new WebSocket(VOICE_RELAY.replace(/^http/, 'ws') + '/live-voice')
+      ws.onopen = () => {
+        if (ws !== relaySocket) return
+        relayFails = 0
+        if (afterFailure) showVoiceStatus('Связь восстановлена, слушаю')
+      }
+      ws.onmessage = (e) => {
+        let msg
+        try { msg = JSON.parse(e.data) } catch { return }
+        if (msg.type === 'final' && msg.text) queueFinalTranscript(msg.text)
+        else if (msg.type === 'interim' && msg.text) showVoiceStatus('Слышу: ' + msg.text)
+        else if (msg.type === 'status' && msg.text) showVoiceStatus(msg.text)
+        else if (msg.type === 'error') showVoiceStatus('Ошибка: ' + msg.error)
+      }
+      ws.onerror = () => {}
+      ws.onclose = (e) => {
+        lastCloseInfo = e && e.code && e.code !== 1000 ? ' (' + e.code + ')' : ''
+        // Закрытие уже заменённого сокета игнорируем — иначе поверх живого соединения
+        // поднимется второе, а ссылка на него потеряется.
+        if (ws !== relaySocket) return
+        relaySocket = null
+        if (!continuousActive || voicePaused) return
+        scheduleRelayReconnect()
+      }
+      relaySocket = ws
+    }
+
+    function startLiveSession() {
+      relayFails = 0
+      lastTranscript = ''
+      pendingTranscript = ''
+      pendingPhrases = []
+      connectRelay(false)
+    }
+
+    function teardownLiveSession() {
+      if (relayReconnectTimer !== null) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null }
+      if (transcriptTimer !== null) { clearTimeout(transcriptTimer); transcriptTimer = null }
+      closeRelaySocket()
+      pendingTranscript = ''
+      pendingPhrases = []
+    }
+
+    // Полная разборка аудио-тракта: воркл, контекст, треки микрофона, вейклок.
+    function teardownAudio() {
+      if (workletNode) { try { workletNode.port.onmessage = null; workletNode.disconnect() } catch {}; workletNode = null }
+      if (audioContext) { try { audioContext.close() } catch {}; audioContext = null }
+      if (voiceStream) { voiceStream.getTracks().forEach(t => t.stop()); voiceStream = null }
+      releaseVoiceWakeLock()
+    }
+
+    // Сворачивание своей же попытки запуска. Если глобальные voiceStream/audioContext
+    // уже перехватила следующая попытка — трогаем только собственный поток, иначе
+    // погасили бы живой микрофон вместо своего.
+    function abortVoiceSetup(stream) {
+      if (!stream || voiceStream === stream) { teardownAudio(); return }
+      stream.getTracks().forEach(t => t.stop())
+    }
+
+    async function setupAudioPipeline(stream) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      // Контекст создаётся уже после await getUserMedia, то есть вне синхронного стека
+      // пользовательского жеста — Safari/iOS стартует его в suspended, и в воркл не
+      // приходит ни одного сэмпла: режим «слушает» молча и навсегда.
+      if (audioContext.state === 'suspended') { try { await audioContext.resume() } catch {} }
+      const workletUrl = URL.createObjectURL(new Blob([PCM_WORKLET_CODE], { type: 'application/javascript' }))
+      // Модуль уже загружен — blob-URL больше не нужен, иначе он копится на каждый рестарт.
+      try { await audioContext.audioWorklet.addModule(workletUrl) } finally { URL.revokeObjectURL(workletUrl) }
+      const source = audioContext.createMediaStreamSource(stream)
+      // Ограничиваем полосу до речевой ДО того, как воркл проредит 48кГц в 16кГц.
+      // Прореживание там простое, без фильтра, поэтому всё выше 8кГц заворачивалось
+      // обратно в речевой диапазон широкополосным шипением (алиасинг) — распознавание
+      // разбирало речь сквозь него. Заодно срезаем гул ниже 80Гц: шаги, стулья, стол.
+      const highpass = audioContext.createBiquadFilter()
+      highpass.type = 'highpass'
+      highpass.frequency.value = 80
+      const lowpass = audioContext.createBiquadFilter()
+      lowpass.type = 'lowpass'
+      lowpass.frequency.value = 7000
+      workletNode = new AudioWorkletNode(audioContext, 'pcm-processor')
+      workletNode.port.onmessage = (e) => {
+        if (!relaySocket || relaySocket.readyState !== WebSocket.OPEN) return
+        const base64 = arrayBufferToBase64(e.data)
+        relaySocket.send(JSON.stringify({ realtimeInput: { audio: { data: base64, mimeType: 'audio/pcm;rate=16000' } } }))
+      }
+      // Тихий гейн вместо прямого коннекта к destination — держит граф "живым" для
+      // AudioWorklet, но не даёт микрофону слышаться из динамика (эхо).
+      const silentGain = audioContext.createGain()
+      silentGain.gain.value = 0
+      source.connect(highpass)
+      highpass.connect(lowpass)
+      lowpass.connect(workletNode)
+      workletNode.connect(silentGain)
+      silentGain.connect(audioContext.destination)
+    }
+
+    async function startContinuousVoice() {
+      // Флаг continuousActive поднимается только в самом конце, поэтому без отдельной
+      // защиты второй клик по кнопке успевал запустить второй микрофонный поток поверх
+      // первого — первый терялся и горел до перезагрузки страницы.
+      if (continuousActive || voiceStarting) return
+      // Ключ Google браузеру больше не нужен — распознавание идёт через сервер, ключ
+      // лежит в его переменных окружения. Здесь нужен только Polza, для ответов.
+      if (!apiKeys.polza) {
+        alert('Сначала укажи ключ Polza в настройках — без него не будет ответов')
+        document.getElementById('settingsModal').classList.add('open')
+        return
+      }
+      voiceStarting = true
+      const session = ++voiceSession
+      try {
+        let deviceId = null
+        try {
+          const probe = await navigator.mediaDevices.getUserMedia({ audio: true })
+          probe.getTracks().forEach(t => t.stop())
+          deviceId = await pickMicDeviceId()
+        } catch (e) {
+          alert('Нет доступа к микрофону')
+          setVoiceUiListening(false)
+          return
+        }
+        if (session !== voiceSession) return
+        let stream = null
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints(deviceId) })
+          // Пока ждали разрешение, режим могли остановить — поток гасим сразу.
+          if (session !== voiceSession) { stream.getTracks().forEach(t => t.stop()); return }
+          voiceStream = stream
+          await setupAudioPipeline(stream)
+          if (session !== voiceSession) { abortVoiceSetup(stream); return }
+        } catch (e) {
+          // Поток мог открыться и упасть уже на сборке пайплайна — гасим всё,
+          // иначе микрофон остаётся включённым.
+          abortVoiceSetup(stream)
+          // Остановка во время запуска роняет сборку пайплайна на закрытом контексте —
+          // это не отказ в доступе, молчим.
+          if (session !== voiceSession) return
+          alert('Нет доступа к микрофону')
+          setVoiceUiListening(false)
+          return
+        }
+        continuousActive = true
+        voicePaused = false
+        lastVoiceAnswer = ''
+        conversationHistory = []
+        document.getElementById('tasksList').innerHTML = ''
+        setVoiceUiListening(true)
+        acquireVoiceWakeLock()
+        startLiveSession()
+      } finally {
+        voiceStarting = false
+      }
+    }
+
+    function stopContinuousVoice() {
+      // Сдвигаем номер сессии: запуск или восстановление, зависшие на await, увидят
+      // несовпадение и не поднимут микрофон уже после остановки.
+      voiceSession++
+      continuousActive = false
+      voicePaused = false
+      setVoiceUiListening(false)
+      teardownLiveSession()
+      teardownAudio()
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!continuousActive) return
+      if (document.visibilityState === 'hidden') {
+        if (voicePaused) return
+        // Пауза, а не остановка: teardownLiveSession снимает обработчики, поэтому
+        // реконнект не поднимет сессию в фоне, где аудио всё равно некому отправлять.
+        voicePaused = true
+        voiceSession++
+        teardownLiveSession()
+        teardownAudio()
+      } else if (document.visibilityState === 'visible') {
+        if (!voicePaused) return
+        voicePaused = false
+        const session = ++voiceSession
+        let savedMic = null
+        try { savedMic = localStorage.getItem(MIC_STORAGE_KEY) } catch {}
+        navigator.mediaDevices.getUserMedia({ audio: micConstraints(savedMic) }).then(async stream => {
+          if (session !== voiceSession) { stream.getTracks().forEach(t => t.stop()); return }
+          voiceStream = stream
+          await setupAudioPipeline(stream)
+          if (session !== voiceSession) { abortVoiceSetup(stream); return }
+          acquireVoiceWakeLock()
+          startLiveSession()
+        }).catch(() => {
+          if (session !== voiceSession) return
+          giveUpContinuousVoice()
+        })
+      }
+    })
+
+    function toBase64(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image()
+        img.onload = () => {
+          const MAX = 1600
+          let w = img.width, h = img.height
+          if (w > MAX || h > MAX) {
+            if (w > h) { h = Math.round(h * MAX / w); w = MAX }
+            else { w = Math.round(w * MAX / h); h = MAX }
+          }
+          const c = document.createElement('canvas')
+          c.width = w; c.height = h
+          c.getContext('2d').drawImage(img, 0, 0, w, h)
+          resolve(c.toDataURL('image/jpeg', 0.80).split(',')[1])
+        }
+        img.onerror = () => reject(new Error('Не удалось прочитать файл'))
+        img.src = URL.createObjectURL(file)
+      })
+    }
+
+    function show(id)  { document.getElementById(id).style.display = 'flex' }
+    function hide(id)  { document.getElementById(id).style.display = 'none' }
+    function block(id) { document.getElementById(id).style.display = 'block' }
+    function setText(id, text) { document.getElementById(id).textContent = text }
+
+    let lastAnswer = ''
+    let lastTasks = []
+    let lastPhotoUrl = null
+    let timerInterval = null
+    let sendQueue = null
+
+    function startTimer() {}
+    function stopTimer() {}
+
+    function splitTasks(text) {
+      const countMatch = text.match(/TASKS:(\d+)/)
+      const clean = text.replace(/TASKS:\d+/, '').trim().replace(/\r\n/g, '\n')
+      const parts = clean.split(/\n[ \t]*\n+/).map(p => p.trim()).filter(Boolean)
+      if (countMatch) {
+        const n = parseInt(countMatch[1])
+        if (parts.length === n) return parts
+        const numbered = clean.split(/^(?=\d{1,2}[.) ])/m).map(p => p.trim()).filter(Boolean)
+        if (numbered.length === n) return numbered
+        return parts.length > 1 ? parts : [clean]
+      }
+      if (parts.length > 1) return parts
+      const numbered = clean.split(/^(?=\d{1,2}[.) ])/m).map(p => p.trim()).filter(Boolean)
+      return numbered.length > 1 ? numbered : [clean]
+    }
+
+    // Результаты живут отдельно для каждого предмета. Область ответа одна на всё
+    // приложение, поэтому при переключении снимаем её состояние для старого предмета
+    // и возвращаем сохранённое для нового — разбор алгебры больше не пропадает
+    // из-за того, что следом сфотографировали геометрию.
+    const SUBJECT_VIEW_NODES = [
+      ['tasksList', true], ['taskBtnsBar', true], ['resultCard', true], ['errorCard', true],
+      ['tasksHeader', false], ['resultHeader', false], ['resultResendBtn', false],
+      ['shootBtn', false], ['galleryBtn', false], ['againBtn', false], ['galleryBtn2', false], ['savePhotoBtn', false]
+    ]
+    const subjectViews = {}
+    let pristineView = null
+
+    function captureSubjectView() {
+      const nodes = {}
+      SUBJECT_VIEW_NODES.forEach(([id, withHtml]) => {
+        const el = document.getElementById(id)
+        if (el) nodes[id] = { display: el.style.display, html: withHtml ? el.innerHTML : null }
+      })
+      return {
+        nodes, answer: lastAnswer, voiceAnswer: lastVoiceAnswer,
+        tasks: lastTasks.slice(), nextIdx: nextTaskIdx, photoUrl: lastPhotoUrl, files: lastFiles
+      }
+    }
+
+    function restoreSubjectView(snap) {
+      if (!snap) return
+      SUBJECT_VIEW_NODES.forEach(([id, withHtml]) => {
+        const el = document.getElementById(id)
+        const saved = snap.nodes[id]
+        if (!el || !saved) return
+        if (withHtml && saved.html !== null) el.innerHTML = saved.html
+        el.style.display = saved.display
+      })
+      lastAnswer = snap.answer
+      lastVoiceAnswer = snap.voiceAnswer
+      lastTasks = snap.tasks.slice()
+      nextTaskIdx = snap.nextIdx
+      lastPhotoUrl = snap.photoUrl
+      lastFiles = snap.files
+      // Кнопки задач создаются кодом, а не разметкой, поэтому обработчики на них
+      // не переживают восстановление html — вешаем заново.
+      lastTasks.forEach((task, i) => {
+        const btn = document.getElementById('task-btn-' + i)
+        if (btn) btn.onclick = () => sendTask(i, lastTasks.length)
+      })
+    }
+
+    function switchSubject(value) {
+      if (value === currentSubject) return
+      // Очередь автоотправки принадлежала прежнему предмету: её задачи уже заменены
+      // в lastTasks, и продолжение слало бы на часы чужие ответы.
+      if (sendQueue) clearTimeout(sendQueue)
+      autoSendCancel = null
+      subjectViews[currentSubject] = captureSubjectView()
+      currentSubject = value
+      restoreSubjectView(subjectViews[value] || pristineView)
+      updateVoiceBtn()
+      autoModelForSubject()
+    }
+
+    function renderTasks(tasks) {
+      const list = document.getElementById('tasksList')
+      const header = document.getElementById('tasksHeader')
+      const bar = document.getElementById('taskBtnsBar')
+      list.innerHTML = ''
+      bar.innerHTML = ''
+      const total = tasks.length
+      tasks.forEach((task, i) => {
+        const card = document.createElement('div')
+        card.className = 'task-card'
+        card.innerHTML = `
+          <div class="task-num">№${i + 1}</div>
+          <div class="task-text">${task.replace(/</g, '&lt;')}</div>
+        `
+        list.appendChild(card)
+        const btn = document.createElement('button')
+        btn.id = `task-btn-${i}`
+        btn.textContent = String(i + 1)
+        btn.style.cssText = 'flex:1;height:40px;border:none;border-radius:10px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s'
+        btn.onclick = () => sendTask(i, total)
+        bar.appendChild(btn)
+      })
+      header.style.display = total > 0 ? 'block' : 'none'
+      list.style.display = 'flex'
+    }
+
+    async function sendTask(idx, total) {
+      const task = lastTasks[idx]
+      if (!task) return
+      const btn = document.getElementById(`task-btn-${idx}`)
+      const num = String(idx + 1)
+      if (btn) { btn.textContent = '...'; btn.style.background = '#ddd' }
+      try {
+        browserNotify(`${idx + 1}/${total ?? lastTasks.length}`, task)
+        if (btn) { btn.textContent = '✓'; btn.style.background = '#E8F5E9'; btn.style.color = '#2E7D32'; setTimeout(() => { btn.textContent = num; btn.style.background = '#F0EDFF'; btn.style.color = '#7B61FF' }, 2000) }
+      } catch(e) {
+        if (btn) { btn.textContent = '!'; btn.style.background = '#FFE0E0'; btn.style.color = '#FF453A'; setTimeout(() => { btn.textContent = num; btn.style.background = '#F0EDFF'; btn.style.color = '#7B61FF' }, 2000) }
+      }
+    }
+
+    let autoSendCancel = null
+    function autoSendAllTasks(tasks) {
+      if (sendQueue) clearTimeout(sendQueue)
+      const token = {}
+      autoSendCancel = token
+      const total = tasks.length
+      let i = 0
+      async function sendNext() {
+        if (token !== autoSendCancel) return
+        if (i >= total) return
+        try { await sendTask(i, total) } catch(e) {}
+        i++
+        if (token !== autoSendCancel) return
+        const delay = currentSubject === 'probability' ? 30000 : 60000
+        if (i < total) sendQueue = setTimeout(sendNext, delay)
+      }
+      sendNext()
+    }
+
+    let lastFiles = []
+
+    async function regenerate() {
+      if (!lastFiles.length) return
+      autoSendCancel = null
+      if (sendQueue) clearTimeout(sendQueue)
+      hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
+      hide('errorCard')
+      document.getElementById('tasksList').style.display = 'none'
+      document.getElementById('tasksHeader').style.display = 'none'
+      show('status')
+      startTimer()
+      try {
+        const images = await Promise.all(lastFiles.map(toBase64))
+        const data = await analyzePhotos(images)
+        if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
+        const displayAnswer = currentSubject === 'geometry' ? parseAndRenderGeometry(data.answer) : (renderFigure(null), data.answer)
+        lastAnswer = displayAnswer
+        lastTasks = splitTasks(displayAnswer)
+        nextTaskIdx = 0
+        stopTimer()
+        hide('status')
+        const usedModel = data.model || currentModel
+        const singleSubjects = ['society', 'history', 'other']
+        if (lastTasks.length > 1 && !singleSubjects.includes(currentSubject)) {
+          hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
+          renderTasks(lastTasks)
+          autoSendAllTasks(lastTasks)
+        } else {
+          document.getElementById('tasksList').style.display = 'none'
+          setText('resultText', displayAnswer)
+
+          document.getElementById('resultHeader').style.display = 'block'
+          document.getElementById('resultResendBtn').style.display = 'block'
+          block('resultCard')
+          browserNotify('Tutor', displayAnswer)
+        }
+        document.getElementById('savePhotoBtn').style.display = 'block'
+      } catch(e) {
+        stopTimer()
+        hide('status')
+        setText('errorText', e.message || 'Ошибка')
+        block('errorCard')
+      }
+    }
+
+    let lastTap = 0
+    let nextTaskIdx = 0
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now()
+      if (now - lastTap < 300) {
+        const singleMode = ['society', 'history', 'other'].includes(currentSubject)
+        if (singleMode && lastAnswer) {
+          resendToWatch()
+        } else if (lastTasks.length > 0) {
+          if (nextTaskIdx < lastTasks.length) {
+            sendTask(nextTaskIdx, lastTasks.length)
+            nextTaskIdx++
+          } else {
+            nextTaskIdx = 0
+          }
+        }
+      }
+      lastTap = now
+    })
+
+    async function resendToWatch() {
+      if (!lastAnswer) return
+      const btn = document.getElementById('resultResendBtn')
+      btn.textContent = 'Отправляю...'
+      btn.disabled = true
+      try {
+        browserNotify('Tutor', lastAnswer)
+        btn.textContent = 'Отправлено!'
+        setTimeout(() => { btn.textContent = 'Отправить'; btn.disabled = false }, 2000)
+      } catch(e) {
+        btn.textContent = 'Ошибка'; btn.disabled = false
+      }
+    }
+
+    async function handlePhoto(input) {
+      const files = Array.from(input.files)
+      if (!files.length) return
+
+      lastFiles = files
+      lastPhotoUrl = URL.createObjectURL(files[0])
+
+      hide('shootBtn')
+      hide('galleryBtn')
+      block('againBtn')
+      block('galleryBtn2')
+      hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
+      hide('errorCard')
+      document.getElementById('savePhotoBtn').style.display = 'block'
+
+      show('status')
+      startTimer()
+
+      let wakeLock = null
+      try { wakeLock = await navigator.wakeLock.request('screen') } catch {}
+
+      const images = await Promise.all(files.map(toBase64))
+      try {
+        const data = await analyzePhotos(images)
+        if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
+        const displayAnswer = currentSubject === 'geometry' ? parseAndRenderGeometry(data.answer) : (renderFigure(null), data.answer)
+        lastAnswer = displayAnswer
+        lastTasks = splitTasks(displayAnswer)
+        nextTaskIdx = 0
+        stopTimer()
+        hide('status')
+        const usedModel = data.model || currentModel
+        const singleSubjects2 = ['society', 'history', 'other']
+        if (lastTasks.length > 1 && !singleSubjects2.includes(currentSubject)) {
+          hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
+          renderTasks(lastTasks)
+          autoSendAllTasks(lastTasks)
+        } else {
+          document.getElementById('tasksList').style.display = 'none'
+          setText('resultText', displayAnswer)
+
+          document.getElementById('resultHeader').style.display = 'block'
+          document.getElementById('resultResendBtn').style.display = 'block'
+          document.getElementById('resultCost').textContent = ''
+          block('resultCard')
+          browserNotify('Tutor', displayAnswer)
+        }
+        document.getElementById('savePhotoBtn').style.display = 'block'
+      } catch (e) {
+        stopTimer()
+        hide('status')
+        setText('errorText', e.message || 'Не удалось подключиться к серверу')
+        block('errorCard')
+      }
+      if (wakeLock) try { wakeLock.release() } catch {}
+    }
+  </script>
+
+
+</body>
+</html>
