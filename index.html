@@ -261,7 +261,7 @@
   </div>
 
   <div id="tasksHeader" style="display:none;width:100%;max-width:400px;margin-top:10px;margin-bottom:10px">
-    <div id="taskBtnsBar" style="display:flex;gap:8px;margin-bottom:8px"></div>
+    <div id="taskBtnsBar" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
     <div style="display:flex;gap:8px">
       <button onclick="autoSendAllTasks(lastTasks)" style="flex:1;padding:14px;border:none;border-radius:12px;background:#7B61FF;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Отправить все</button>
       <button onclick="regenerate()" style="padding:14px 18px;border:none;border-radius:12px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Заново</button>
@@ -1394,7 +1394,9 @@ SKIP, если фраза — что угодно из:
         const btn = document.createElement('button')
         btn.id = `task-btn-${i}`
         btn.textContent = String(i + 1)
-        btn.style.cssText = 'flex:1;height:40px;border:none;border-radius:10px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s'
+        // flex-basis 44px и перенос строк: без них двадцать заданий сжимали кнопки до 7px,
+        // и попасть пальцем было невозможно. 44px — минимальная площадь касания.
+        btn.style.cssText = 'flex:1 1 44px;min-width:44px;height:40px;border:none;border-radius:10px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s'
         btn.onclick = () => sendTask(i, total)
         bar.appendChild(btn)
       })
