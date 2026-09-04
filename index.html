@@ -83,6 +83,20 @@
       align-items: center;
       gap: 8px;
     }
+    /* Кнопки количества листов рядом с основной: 2, 3, 4 снимка подряд. */
+    .sheet-btn {
+      width: 44px;
+      border: none;
+      border-radius: 12px;
+      background: #FFF3E0;
+      color: #F57C00;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: var(--font);
+      flex: 0 0 auto;
+    }
+    .sheet-btn:active { background: #FFE0B2; }
     .btn-primary { background: #7B61FF; color: #fff; }
     .btn-secondary { background: #F0EDFF; color: #7B61FF; display: block; }
 
@@ -224,13 +238,18 @@
 
   <div id="photoScreen">
 
-  <input type="file" accept="image/*" capture="environment" id="camera" style="display:none" onchange="handlePhoto(this)">
-  <input type="file" accept="image/*" multiple id="gallery" style="display:none" onchange="handlePhoto(this)">
+  <input type="file" accept="image/*" capture="environment" id="camera" style="display:none" onchange="onPhotoInput(this)">
+  <input type="file" accept="image/*" multiple id="gallery" style="display:none" onchange="onPhotoInput(this)">
 
   <div class="card">
-    <button class="btn btn-primary" id="shootBtn" onclick="document.getElementById('camera').click()">Сфотографировать задачу</button>
+    <div style="display:flex;gap:8px;align-items:stretch;width:100%">
+      <button class="btn btn-primary" id="shootBtn" onclick="shootButtonAction()" style="flex:1;margin:0">Сфотографировать задачу</button>
+      <button class="sheet-btn" onclick="startShooting(2)" title="2 листа">2</button>
+      <button class="sheet-btn" onclick="startShooting(3)" title="3 листа">3</button>
+      <button class="sheet-btn" onclick="startShooting(4)" title="4 листа">4</button>
+    </div>
     <button class="btn btn-secondary" id="galleryBtn" onclick="document.getElementById('gallery').click()">Загрузить из галереи</button>
-    <button class="btn btn-primary" id="againBtn" onclick="document.getElementById('camera').click()" style="display:none">Сфотографировать заново</button>
+    <button class="btn btn-primary" id="againBtn" onclick="startShooting(1)" style="display:none">Сфотографировать заново</button>
     <button class="btn btn-secondary" id="galleryBtn2" onclick="document.getElementById('gallery').click()" style="display:none">Загрузить из галереи</button>
     <button class="btn" id="savePhotoBtn" onclick="savePhoto()" style="display:none;background:#FFF3E0;color:#F57C00;font-weight:600">Скачать фото</button>
     <div id="voiceGroup" style="display:none;gap:8px">
@@ -466,21 +485,33 @@
         .replace(/([\d)a-zA-Zа-яА-Я]) \* (?=[\d(a-zA-Zа-яА-Я])/g, '$1 · ')
         .replace(/([\d)a-zA-Zа-яА-Я])\*(?=[\d(a-zA-Zа-яА-Я])/g, '$1·')
       let text = toWatchText(withMul.replace(/\*\*/g, '').replace(/\*/g, '').replace(/#{1,6}\s/g, '').trim())
-      const CHUNK = 200
-      const chunks = []
+      // Часы обрезают длинные уведомления, поэтому режем сами, по 150 символов.
+      // Два символа держим в запасе под многоточия, которыми помечаем продолжение.
+      const CHUNK = 150
+      // Переносить стоит только во второй половине куска: иначе один ранний перенос
+      // строки резал текст на множество огрызков.
+      const MIN_BREAK = Math.floor(CHUNK * 0.6)
+      const raw = []
       while (text.length > 0) {
-        let end = Math.min(CHUNK, text.length)
+        let end = Math.min(CHUNK - 2, text.length)
         if (end < text.length) {
+          // Рвать лучше по концу строки: тогда «Дано», «Решение» и «Ответ» не
+          // разрезаются посередине и каждое сообщение остаётся осмысленным куском.
           const ln = text.lastIndexOf('\n', end)
           const ls = text.lastIndexOf(' ', end)
-          end = ln > 0 ? ln : ls > 0 ? ls : end
+          if (ln >= MIN_BREAK) end = ln
+          else if (ls >= MIN_BREAK) end = ls
         }
-        chunks.push(text.substring(0, end).trim())
+        raw.push(text.substring(0, end).trim())
         text = text.substring(end).trim()
       }
+      // Многоточия показывают, что мысль продолжается в следующем уведомлении,
+      // а номер части — что за чем идёт, если часы покажут их не по порядку.
+      const chunks = raw.map((part, i) => (i > 0 ? '…' : '') + part + (i < raw.length - 1 ? '…' : ''))
       chunks.forEach((chunk, i) => {
+        const chunkTitle = chunks.length > 1 ? `${title} ч.${i + 1}/${chunks.length}` : title
         setTimeout(() => {
-          try { new Notification(title, { body: chunk, silent: i > 0 }) } catch {}
+          try { new Notification(chunkTitle, { body: chunk, silent: i > 0 }) } catch {}
         }, i * 500)
       })
     }
@@ -1300,6 +1331,10 @@ SKIP, если фраза — что угодно из:
     function startTimer() {}
     function stopTimer() {}
 
+    // Метка TASKS:n — служебная, нужна только разбивке. На экран и на часы она
+    // попадать не должна: при одном задании она уезжала прямо в текст ответа.
+    const stripTasksMarker = (t) => String(t).replace(/^\s*TASKS:\s*\d+\s*/i, '').trim()
+
     function splitTasks(text) {
       const countMatch = text.match(/TASKS:(\d+)/)
       // Модель, несмотря на запрет, иногда оформляет номера markdown-разметкой:
@@ -1414,9 +1449,13 @@ SKIP, если фраза — что угодно из:
       list.style.display = 'flex'
     }
 
-    async function sendTask(idx, total) {
+    async function sendTask(idx, total, token) {
       const task = lastTasks[idx]
       if (!task) return
+      // Очередь могли перезапустить двойным касанием, пока это задание ждало отправки.
+      // Без этой проверки уже отменённая очередь успевала дослать своё сообщение поверх
+      // новой, и на часы приходили номера вперемешку.
+      if (token && token !== autoSendCancel) return
       const btn = document.getElementById(`task-btn-${idx}`)
       const num = String(idx + 1)
       if (btn) { btn.textContent = '...'; btn.style.background = '#ddd' }
@@ -1438,7 +1477,7 @@ SKIP, если фраза — что угодно из:
       async function sendNext() {
         if (token !== autoSendCancel) return
         if (i >= total) return
-        try { await sendTask(i, total) } catch(e) {}
+        try { await sendTask(i, total, token) } catch(e) {}
         i++
         if (token !== autoSendCancel) return
         const delay = currentSubject === 'probability' ? 30000 : 60000
@@ -1464,7 +1503,7 @@ SKIP, если фраза — что угодно из:
         const data = await analyzePhotos(images)
         if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
         const displayAnswer = currentSubject === 'geometry' ? parseAndRenderGeometry(data.answer) : (renderFigure(null), data.answer)
-        lastAnswer = displayAnswer
+        lastAnswer = stripTasksMarker(displayAnswer)
         lastTasks = splitTasks(displayAnswer)
         nextTaskIdx = 0
         stopTimer()
@@ -1477,12 +1516,12 @@ SKIP, если фраза — что угодно из:
           autoSendAllTasks(lastTasks)
         } else {
           document.getElementById('tasksList').style.display = 'none'
-          setText('resultText', displayAnswer)
+          setText('resultText', lastAnswer)
 
           document.getElementById('resultHeader').style.display = 'block'
           document.getElementById('resultResendBtn').style.display = 'block'
           block('resultCard')
-          browserNotify('Tutor', displayAnswer)
+          browserNotify('Tutor', lastAnswer)
         }
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch(e) {
@@ -1498,17 +1537,21 @@ SKIP, если фраза — что угодно из:
     document.addEventListener('touchend', (e) => {
       const now = Date.now()
       if (now - lastTap < 300) {
+        // Сбрасываем метку сразу: иначе третье касание подряд попадает в то же окно
+        // и запускает отправку заново — случайный лишний тап сбивал очередь.
+        lastTap = 0
         const singleMode = ['society', 'history', 'other'].includes(currentSubject)
         if (singleMode && lastAnswer) {
           resendToWatch()
         } else if (lastTasks.length > 0) {
-          if (nextTaskIdx < lastTasks.length) {
-            sendTask(nextTaskIdx, lastTasks.length)
-            nextTaskIdx++
-          } else {
-            nextTaskIdx = 0
-          }
+          // Двойное касание запускает отправку с ПЕРВОГО задания и дальше по очереди.
+          // Раньше каждое касание слало следующее по счёту, и после последнего одно
+          // касание уходило впустую на сброс счётчика — с середины урока было не понять,
+          // на каком задании ты остановился.
+          nextTaskIdx = 0
+          autoSendAllTasks(lastTasks)
         }
+        return
       }
       lastTap = now
     })
@@ -1525,6 +1568,70 @@ SKIP, если фраза — что угодно из:
       } catch(e) {
         btn.textContent = 'Ошибка'; btn.disabled = false
       }
+    }
+
+    // ===== Съёмка нескольких листов =====
+    // Системная камера отдаёт по одному снимку за раз, поэтому копим их сами:
+    // нажал «3» — снимаешь три листа подряд, и только потом всё уходит в модель
+    // одним запросом. Между снимками кнопка показывает, сколько осталось.
+    let shotsNeeded = 1
+    let shotsCollected = []
+
+    function startShooting(n) {
+      shotsNeeded = n
+      shotsCollected = []
+      // Кнопки листов видны и после разбора, когда основная кнопка спрятана. Начали
+      // новую серию — возвращаем её на экран, иначе номер снимка показывать негде.
+      document.getElementById('shootBtn').style.display = 'flex'
+      hide('againBtn')
+      updateShootButton()
+      document.getElementById('camera').click()
+    }
+
+    function shootButtonAction() {
+      // Дожимаем начатую серию, если она не закончена, иначе начинаем новую с одного листа.
+      if (shotsCollected.length && shotsCollected.length < shotsNeeded) {
+        document.getElementById('camera').click()
+      } else {
+        startShooting(1)
+      }
+    }
+
+    function updateShootButton() {
+      const btn = document.getElementById('shootBtn')
+      const left = shotsNeeded - shotsCollected.length
+      btn.textContent = (shotsNeeded > 1 && shotsCollected.length)
+        ? `Снимок ${shotsCollected.length + 1} из ${shotsNeeded}`
+        : 'Сфотографировать задачу'
+      btn.style.background = left > 0 && shotsCollected.length ? '#F57C00' : ''
+    }
+
+    function onPhotoInput(input) {
+      const files = Array.from(input.files)
+      // Сбрасываем значение: без этого повторный выбор того же файла не даёт события,
+      // и второй снимок той же страницы просто не приходит.
+      input.value = ''
+      if (!files.length) return
+      // Галерея отдаёт нужное количество файлов сразу — счётчик листов ей не нужен.
+      if (input.id === 'gallery') {
+        shotsNeeded = 1
+        shotsCollected = []
+        updateShootButton()
+        handlePhoto({ files })
+        return
+      }
+      shotsCollected.push(files[0])
+      if (shotsCollected.length < shotsNeeded) {
+        updateShootButton()
+        // Открыть камеру заново сами не можем: Safari разрешает это только по касанию,
+        // поэтому просим нажать кнопку — она уже показывает номер следующего снимка.
+        return
+      }
+      const all = shotsCollected
+      shotsNeeded = 1
+      shotsCollected = []
+      updateShootButton()
+      handlePhoto({ files: all })
     }
 
     async function handlePhoto(input) {
@@ -1553,7 +1660,7 @@ SKIP, если фраза — что угодно из:
         const data = await analyzePhotos(images)
         if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
         const displayAnswer = currentSubject === 'geometry' ? parseAndRenderGeometry(data.answer) : (renderFigure(null), data.answer)
-        lastAnswer = displayAnswer
+        lastAnswer = stripTasksMarker(displayAnswer)
         lastTasks = splitTasks(displayAnswer)
         nextTaskIdx = 0
         stopTimer()
@@ -1566,13 +1673,13 @@ SKIP, если фраза — что угодно из:
           autoSendAllTasks(lastTasks)
         } else {
           document.getElementById('tasksList').style.display = 'none'
-          setText('resultText', displayAnswer)
+          setText('resultText', lastAnswer)
 
           document.getElementById('resultHeader').style.display = 'block'
           document.getElementById('resultResendBtn').style.display = 'block'
           document.getElementById('resultCost').textContent = ''
           block('resultCard')
-          browserNotify('Tutor', displayAnswer)
+          browserNotify('Tutor', lastAnswer)
         }
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch (e) {
