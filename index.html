@@ -272,6 +272,10 @@
       <button onclick="resendToWatch()" id="resultResendBtn" style="flex:1;padding:14px;border:none;border-radius:12px;background:#7B61FF;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);display:none">Отправить</button>
       <button onclick="regenerate()" id="regenBtn" style="flex:1;padding:14px;border:none;border-radius:12px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Заново</button>
     </div>
+    <div id="halfBtns" style="display:none;gap:8px;margin-top:8px">
+      <button onclick="sendHalf(1)" id="half1Btn" style="flex:1;padding:12px;border:none;border-radius:12px;background:#FFF3E0;color:#F57C00;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font)">1-я половина</button>
+      <button onclick="sendHalf(2)" id="half2Btn" style="flex:1;padding:12px;border:none;border-radius:12px;background:#FFF3E0;color:#F57C00;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font)">2-я половина</button>
+    </div>
   </div>
   <div class="result-card" id="resultCard" style="position:relative">
     <div class="result-label" style="margin-bottom:10px">Ответ</div>
@@ -489,8 +493,9 @@
       return out.replace(/ {2,}/g, ' ')
     }
 
-    function browserNotify(title, body) {
-      if (!('Notification' in window) || Notification.permission !== 'granted') return
+    // Готовим куски для часов, но не отправляем: так их можно послать целиком,
+    // а можно половинами.
+    function watchChunks(body) {
       // Звёздочку умножения переводим в · ДО вырезания markdown: иначе следующая строка
       // съедала её вместе с разметкой, и на часы приходило «0,3 0,02» вместо «0,3 · 0,02».
       // Точка-оператор часами поддерживается и заодно привычнее в записи от руки.
@@ -520,14 +525,72 @@
         raw.push(text.substring(0, end).trim())
         text = text.substring(end).trim()
       }
-      // Что за чем идёт, показывает номер части в заголовке.
-      const chunks = raw
+      return raw
+    }
+
+    // Отправка готовых кусков. offset и total нужны, чтобы номер части в заголовке
+    // считался от всего ответа, даже когда шлём только его половину.
+    function sendChunks(title, chunks, offset, total) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return
       chunks.forEach((chunk, i) => {
-        const chunkTitle = chunks.length > 1 ? `${title} ч.${i + 1}/${chunks.length}` : title
+        const chunkTitle = total > 1 ? `${title} ч.${offset + i + 1}/${total}` : title
         setTimeout(() => {
           try { new Notification(chunkTitle, { body: chunk, silent: i > 0 }) } catch {}
         }, i * 500)
       })
+    }
+
+    function browserNotify(title, body) {
+      const chunks = watchChunks(body)
+      sendChunks(title, chunks, 0, chunks.length)
+    }
+
+    // Длинный ответ (предметы без деления на задания) шлём половинами: первая уходит
+    // сразу, вторая через пять минут. Иначе на часы за раз валится полтора десятка
+    // уведомлений и прочитать их на уроке невозможно.
+    const HALF_GAP_MS = 5 * 60 * 1000
+    let lastWatchChunks = []
+    let secondHalfTimer = null
+
+    function halfRange(which) {
+      const mid = Math.ceil(lastWatchChunks.length / 2)
+      return which === 1
+        ? { from: 0, list: lastWatchChunks.slice(0, mid) }
+        : { from: mid, list: lastWatchChunks.slice(mid) }
+    }
+
+    function sendHalf(which) {
+      if (!lastWatchChunks.length) return
+      const { from, list } = halfRange(which)
+      if (!list.length) return
+      sendChunks('Tutor', list, from, lastWatchChunks.length)
+    }
+
+    function browserNotifyHalves(title, body) {
+      if (secondHalfTimer) { clearTimeout(secondHalfTimer); secondHalfTimer = null }
+      lastWatchChunks = watchChunks(body)
+      const total = lastWatchChunks.length
+      const bar = document.getElementById('halfBtns')
+      // Делить нечего, если кусок всего один — шлём как есть и прячем кнопки половин.
+      if (total <= 1) {
+        if (bar) bar.style.display = 'none'
+        sendChunks(title, lastWatchChunks, 0, total)
+        return
+      }
+      const first = halfRange(1)
+      const second = halfRange(2)
+      sendChunks(title, first.list, 0, total)
+      if (bar) {
+        bar.style.display = 'flex'
+        document.getElementById('half1Btn').textContent = `1–${first.list.length} из ${total}`
+        document.getElementById('half2Btn').textContent = `${second.from + 1}–${total} из ${total}`
+      }
+      if (second.list.length) {
+        secondHalfTimer = setTimeout(() => {
+          secondHalfTimer = null
+          sendChunks(title, second.list, second.from, total)
+        }, HALF_GAP_MS)
+      }
     }
 
     // Единая точка обращения к Polza — раньше этим занимался server.ts.
@@ -598,7 +661,7 @@
       geometry: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее. ВНУТРИ задачи пустых строк не делай — Дано, Решение и Ответ идут подряд, каждое с новой строки. Пустая строка ставится ТОЛЬКО между задачами. Квадрат и куб пиши знаками ² и ³ (см², м³), для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Ответ доводи до числа с единицами измерения, десятичная дробь через запятую. Первая строка: TASKS:[кол-во]. Без вступлений.',
       physics: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее. ВНУТРИ задачи пустых строк не делай — Дано, Найти, Решение и Ответ идут подряд, каждое с новой строки. Пустая строка ставится ТОЛЬКО между задачами. Все величины переводи в СИ. Квадрат и куб пиши знаками ² и ³ (м/с², м³), для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Ответ доводи до числа с единицами измерения, десятичная дробь через запятую. Первая строка: TASKS:[кол-во]. Без вступлений.',
       history: 'Реши задания на фото. ТОЛЬКО краткий ответ: цифры, даты или фамилии. Формат: "1. ответ" на каждой строке. Сопоставление: только цифры слитно (пример: "5. 3142"). Никаких букв A,Б,В — только цифры. Никаких пояснений.',
-      russian: 'Реши задания ЕГЭ по русскому языку с фото. Никакого markdown, никаких пояснений и рассуждений — только ответ, как его записывают в бланк ЕГЭ. Цифры пишутся слитно по возрастанию, без пробелов и запятых: 135. Ответ-слово пиши строчными буквами; если слов несколько, разделяй их пробелом. Если задание требует заменить или исключить слово, пиши то слово, которое идёт в бланк, а не исходное. Если задание не читается на фото, обрезано или в нём нет верного варианта — напиши "не разобрать" и переходи к следующему. Черновик своих рассуждений не выводи никогда. Формат: "1. ответ" на каждой строке. Первая строка: TASKS:[кол-во]. Без вступлений.',
+      russian: 'Реши задания ЕГЭ по русскому языку с фото. Никакого markdown, никаких пояснений и рассуждений — только ответ, как его записывают в бланк ЕГЭ. Цифры пишутся слитно по возрастанию, без пробелов и запятых: 135. Ответ-слово пиши строчными буквами; если слов несколько, разделяй их пробелом. Если задание требует заменить или исключить слово, пиши то слово, которое идёт в бланк, а не исходное. Решай все задания, которые видно на фото. Ничего не додумывай и не восстанавливай по смыслу. Если часть задания физически не видна — обрезана, смазана, закрыта, — напиши для него «не разобрано» и переходи к следующему. «Не разобрано» пиши ТОЛЬКО из-за нечитаемого снимка, а не из-за сложности задания: всё, что видно, решай. Пиши обычными буквами, цифрами и знаками с клавиатуры: без надстрочных и подстрочных знаков, без стрелок и математических символов — текст должен одинаково читаться и на телефоне, и на часах. Черновик своих рассуждений не выводи никогда. Формат: "1. ответ" на каждой строке. Первая строка: TASKS:[кол-во]. Без вступлений.',
       society: 'Обществознание. ТОЛЬКО краткий ответ: цифры или слова. Формат: "1. ответ" на каждой строке. Сопоставление: только цифры слитно ("5. 3142"). Никаких букв A,Б,В. Макс 3-5 слов. Никаких пояснений.',
       other: 'Реши задание на фото. Без вступлений. Только ответ.',
     }
@@ -1381,7 +1444,7 @@ SKIP, если фраза — что угодно из:
     // из-за того, что следом сфотографировали геометрию.
     const SUBJECT_VIEW_NODES = [
       ['tasksList', true], ['taskBtnsBar', true], ['resultCard', true], ['errorCard', true],
-      ['tasksHeader', false], ['resultHeader', false], ['resultResendBtn', false],
+      ['tasksHeader', false], ['resultHeader', false], ['resultResendBtn', false], ['halfBtns', false],
       ['shootBtn', false], ['galleryBtn', false], ['againBtn', false], ['galleryBtn2', false], ['savePhotoBtn', false]
     ]
     const subjectViews = {}
@@ -1428,6 +1491,8 @@ SKIP, если фраза — что угодно из:
       // в lastTasks, и продолжение слало бы на часы чужие ответы.
       if (sendQueue) clearTimeout(sendQueue)
       autoSendCancel = null
+      // Вторая половина ответа тоже принадлежала прежнему предмету.
+      if (secondHalfTimer) { clearTimeout(secondHalfTimer); secondHalfTimer = null }
       subjectViews[currentSubject] = captureSubjectView()
       currentSubject = value
       restoreSubjectView(subjectViews[value] || pristineView)
@@ -1535,7 +1600,7 @@ SKIP, если фраза — что угодно из:
           document.getElementById('resultHeader').style.display = 'block'
           document.getElementById('resultResendBtn').style.display = 'block'
           block('resultCard')
-          browserNotify('Tutor', lastAnswer)
+          browserNotifyHalves('Tutor', lastAnswer)
         }
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch(e) {
@@ -1576,7 +1641,7 @@ SKIP, если фраза — что угодно из:
       btn.textContent = 'Отправляю...'
       btn.disabled = true
       try {
-        browserNotify('Tutor', lastAnswer)
+        browserNotifyHalves('Tutor', lastAnswer)
         btn.textContent = 'Отправлено!'
         setTimeout(() => { btn.textContent = 'Отправить'; btn.disabled = false }, 2000)
       } catch(e) {
@@ -1696,7 +1761,7 @@ SKIP, если фраза — что угодно из:
           document.getElementById('resultResendBtn').style.display = 'block'
           document.getElementById('resultCost').textContent = ''
           block('resultCard')
-          browserNotify('Tutor', lastAnswer)
+          browserNotifyHalves('Tutor', lastAnswer)
         }
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch (e) {
