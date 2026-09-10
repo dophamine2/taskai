@@ -545,6 +545,9 @@
       sendChunks(title, chunks, 0, chunks.length)
     }
 
+    // Предметы, где ответ идёт одним сплошным текстом, без деления на задания.
+    const SINGLE_BLOCK_SUBJECTS = ['society', 'history', 'other']
+
     // Длинный ответ (предметы без деления на задания) шлём половинами: первая уходит
     // сразу, вторая через пять минут. Иначе на часы за раз валится полтора десятка
     // уведомлений и прочитать их на уроке невозможно.
@@ -591,6 +594,23 @@
           sendChunks(title, second.list, second.from, total)
         }, HALF_GAP_MS)
       }
+    }
+
+    // Единственная точка отправки готового ответа на часы. Половинами делим ТОЛЬКО
+    // сплошные предметы. Раньше сюда же попадала геометрия (и физика с алгеброй),
+    // когда на фото была одна задача: ветка «одно задание» слала решение половинами,
+    // и вторая половина приходила через пять минут — на уроке это выглядело как
+    // оборванный ответ. Решение одной задачи цельное, оно уходит целиком.
+    function notifyAnswer(body) {
+      if (SINGLE_BLOCK_SUBJECTS.includes(currentSubject)) {
+        browserNotifyHalves('Tutor', body)
+        return
+      }
+      if (secondHalfTimer) { clearTimeout(secondHalfTimer); secondHalfTimer = null }
+      lastWatchChunks = watchChunks(body)
+      const bar = document.getElementById('halfBtns')
+      if (bar) bar.style.display = 'none'
+      sendChunks('Tutor', lastWatchChunks, 0, lastWatchChunks.length)
     }
 
     // Единая точка обращения к Polza — раньше этим занимался server.ts.
@@ -1089,11 +1109,13 @@ SKIP, если фраза — что угодно из:
         //   gemini-3.7-flash      7010 мс (разброс 2450–9599), 42 токена мыслей
         //   gemini-3.6-flash      1298 мс, 0 мыслей
         //   gemini-3.1-flash-lite 1442 мс, 0 мыслей, 12/12 верных решений
-        //   gemini-3.5-flash-lite 1105 мс, 0 мыслей, 12/12 верных решений  <- выбрана
+        //   gemini-3.5-flash-lite 1105 мс, 0 мыслей, 12/12 верных решений
         // «Reasoning is mandatory» — ограничение конкретно 3.7-flash: остальные модели
         // принимают minimal и не тратят на мысли ни одного токена.
-        // Для разбора фото модель НЕ менять: там нужна сильная, а не быстрая.
-        model: 'google/gemini-3.5-flash-lite',
+        // Везде одна модель — 3.5-flash: на голосе она чуть медленнее lite, но
+        // разбирает вопрос учителя точнее, а разнобой моделей давал разное качество
+        // ответа на один и тот же вопрос в голосе и на фото.
+        model: 'google/gemini-3.5-flash',
         max_tokens: 300,
         temperature: 0.1,
         provider: { only: ['Google AI Studio'], allow_fallbacks: false },
@@ -1481,7 +1503,7 @@ SKIP, если фраза — что угодно из:
       // не переживают восстановление html — вешаем заново.
       lastTasks.forEach((task, i) => {
         const btn = document.getElementById('task-btn-' + i)
-        if (btn) btn.onclick = () => sendTask(i, lastTasks.length)
+        if (btn) btn.onclick = () => autoSendAllTasks(lastTasks, i)
       })
     }
 
@@ -1521,7 +1543,9 @@ SKIP, если фраза — что угодно из:
         // flex-basis 44px и перенос строк: без них двадцать заданий сжимали кнопки до 7px,
         // и попасть пальцем было невозможно. 44px — минимальная площадь касания.
         btn.style.cssText = 'flex:1 1 44px;min-width:44px;height:40px;border:none;border-radius:10px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s'
-        btn.onclick = () => sendTask(i, total)
+        // Не одиночная отправка, а перезапуск очереди с этого номера: нажал «4» —
+        // ушло четвёртое, дальше пятое, шестое, а прежняя очередь остановлена.
+        btn.onclick = () => autoSendAllTasks(lastTasks, i)
         bar.appendChild(btn)
       })
       header.style.display = total > 0 ? 'block' : 'none'
@@ -1547,17 +1571,22 @@ SKIP, если фраза — что угодно из:
     }
 
     let autoSendCancel = null
-    function autoSendAllTasks(tasks) {
-      if (sendQueue) clearTimeout(sendQueue)
+    // startIdx — с какого задания продолжать. Нажатие на номер задачи перезапускает
+    // очередь с этого места: прежняя очередь глушится токеном и снятым таймером,
+    // иначе она параллельно досылала на часы свои старые номера.
+    function autoSendAllTasks(tasks, startIdx) {
+      if (sendQueue) { clearTimeout(sendQueue); sendQueue = null }
       const token = {}
       autoSendCancel = token
       const total = tasks.length
-      let i = 0
+      let i = Math.min(Math.max(Number(startIdx) || 0, 0), total)
       async function sendNext() {
         if (token !== autoSendCancel) return
         if (i >= total) return
+        nextTaskIdx = i
         try { await sendTask(i, total, token) } catch(e) {}
         i++
+        nextTaskIdx = i
         if (token !== autoSendCancel) return
         const delay = currentSubject === 'probability' ? 30000 : 60000
         if (i < total) sendQueue = setTimeout(sendNext, delay)
@@ -1588,8 +1617,7 @@ SKIP, если фраза — что угодно из:
         stopTimer()
         hide('status')
         const usedModel = data.model || currentModel
-        const singleSubjects = ['society', 'history', 'other']
-        if (lastTasks.length > 1 && !singleSubjects.includes(currentSubject)) {
+        if (lastTasks.length > 1 && !SINGLE_BLOCK_SUBJECTS.includes(currentSubject)) {
           hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
           renderTasks(lastTasks)
           autoSendAllTasks(lastTasks)
@@ -1600,7 +1628,7 @@ SKIP, если фраза — что угодно из:
           document.getElementById('resultHeader').style.display = 'block'
           document.getElementById('resultResendBtn').style.display = 'block'
           block('resultCard')
-          browserNotifyHalves('Tutor', lastAnswer)
+          notifyAnswer(lastAnswer)
         }
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch(e) {
@@ -1619,7 +1647,7 @@ SKIP, если фраза — что угодно из:
         // Сбрасываем метку сразу: иначе третье касание подряд попадает в то же окно
         // и запускает отправку заново — случайный лишний тап сбивал очередь.
         lastTap = 0
-        const singleMode = ['society', 'history', 'other'].includes(currentSubject)
+        const singleMode = SINGLE_BLOCK_SUBJECTS.includes(currentSubject)
         if (singleMode && lastAnswer) {
           resendToWatch()
         } else if (lastTasks.length > 0) {
@@ -1641,7 +1669,7 @@ SKIP, если фраза — что угодно из:
       btn.textContent = 'Отправляю...'
       btn.disabled = true
       try {
-        browserNotifyHalves('Tutor', lastAnswer)
+        notifyAnswer(lastAnswer)
         btn.textContent = 'Отправлено!'
         setTimeout(() => { btn.textContent = 'Отправить'; btn.disabled = false }, 2000)
       } catch(e) {
@@ -1748,8 +1776,7 @@ SKIP, если фраза — что угодно из:
         stopTimer()
         hide('status')
         const usedModel = data.model || currentModel
-        const singleSubjects2 = ['society', 'history', 'other']
-        if (lastTasks.length > 1 && !singleSubjects2.includes(currentSubject)) {
+        if (lastTasks.length > 1 && !SINGLE_BLOCK_SUBJECTS.includes(currentSubject)) {
           hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
           renderTasks(lastTasks)
           autoSendAllTasks(lastTasks)
@@ -1761,7 +1788,7 @@ SKIP, если фраза — что угодно из:
           document.getElementById('resultResendBtn').style.display = 'block'
           document.getElementById('resultCost').textContent = ''
           block('resultCard')
-          browserNotifyHalves('Tutor', lastAnswer)
+          notifyAnswer(lastAnswer)
         }
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch (e) {
