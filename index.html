@@ -4,237 +4,449 @@
   <meta charset="UTF-8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#F0F0F0">
+  <link rel="manifest" href="manifest.json?v=2">
   <meta name="apple-mobile-web-app-title" content="Tutor">
   <title>Tutor</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+  <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
   <style>
+    /* Цвета — с первого макета (чёрный, белый, мятный), форма и шрифт — со второго:
+       серый фон экрана, белые карточки без теней, системный SF Pro на iPhone. */
     :root {
-      --font-d: 'Unbounded', sans-serif;
-      --font: 'Manrope', sans-serif;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
+      --bg: #F0F0F0;
+      --surface: #FFFFFF;
+      --fill: #F4F4F4;
+      --line: #E8E8E8;
+      --divider: #F0F0F0;
+      --ink: #0B0B0B;
+      /* Чёрный для кнопок — графит, а не почти чистый чёрный текста: на сером фоне
+         рядом с мятным он не режет глаз. */
+      --btn-dark: #1F1F1F;
+      --btn-dark-press: #333333;
+      --ink-2: #3C3C3C;
+      --muted: #A3A3A3;
+      --mint: #5EF3A0;
+      --mint-press: #48E48C;
+      --mint-soft: #DDFBE8;
+      --danger: #E5484D;
+      --danger-soft: #FDECEC;
+      --r-card: 8px;
+      --r-btn: 3px;
+      --col: 400px;
+      --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, sans-serif;
 
+      /* Стрелка у выпадающих списков в настройках. */
+      --i-chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); -webkit-tap-highlight-color: transparent; }
+    html { background: var(--bg); }
     body {
-      background: #F5F6FA;
+      background: var(--bg);
+      color: var(--ink);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 0 16px 40px;
-      color: #111;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
     }
+    button {
+      font-family: var(--font);
+      color: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    button:disabled { cursor: default; }
 
+    /* ---------- Шапка: иконка слева, название по центру, действие справа ---------- */
     header {
       width: 100%;
-      max-width: 400px;
-      display: flex;
-      justify-content: space-between;
+      max-width: var(--col);
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      padding: 20px 0;
-      margin-bottom: 20px;
+      padding: 12px 0;
+      margin-bottom: 4px;
     }
-
-    .logo { font-size: 20px; font-weight: 800; color: #111; letter-spacing: -0.5px; font-family: var(--font-d); }
-    
-    .settings-icon {
-      width: 36px; height: 36px;
+    .icon-btn {
+      justify-self: start;
+      width: 40px; height: 40px;
+      margin-left: -8px;
       display: flex; align-items: center; justify-content: center;
-      background: #fff;
-      border-radius: 10px;
-      border: 1px solid #EAEAF2;
-      color: #7B61FF;
-      cursor: pointer;
+      border: none;
+      border-radius: var(--r-btn);
+      background: transparent;
+      color: var(--ink);
     }
+    .icon-btn:active { background: rgba(0, 0, 0, 0.05); }
+    .brand { display: flex; align-items: baseline; gap: 6px; text-decoration: none; color: var(--ink); }
+    .logo { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+    .version { font-size: 11px; font-weight: 500; color: var(--muted); }
+    .pill {
+      justify-self: end;
+      height: 30px;
+      padding: 0 12px;
+      border: none;
+      border-radius: var(--r-btn);
+      background: #E4E4E4;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    #modelBtn[data-state="pro"] { background: var(--btn-dark); color: #fff; }
 
-
+    /* ---------- Карточки и кнопки ---------- */
     .card {
-      background: #fff;
-      border-radius: 16px;
-      padding: 16px;
       width: 100%;
-      max-width: 400px;
-      margin-bottom: 10px;
-      border: 1px solid #EAEAF2;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+      max-width: var(--col);
+      background: var(--surface);
+      border-radius: var(--r-card);
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
-
-
-
+    .row { display: flex; gap: 8px; width: 100%; align-items: stretch; }
     .btn {
-      width: 100%;
-      padding: 16px;
-      border: none;
-      border-radius: 12px;
+      flex: 1;
+      min-height: 52px;
+      padding: 14px 16px;
+      border: 1px solid transparent;
+      border-radius: var(--r-btn);
       font-size: 15px;
       font-weight: 600;
-      cursor: pointer;
+      line-height: 22px;
+      letter-spacing: -0.1px;
       display: flex;
-      justify-content: center;
       align-items: center;
-      gap: 8px;
+      justify-content: center;
+      text-align: center;
     }
-    /* Кнопки количества листов рядом с основной: 2, 3, 4 снимка подряд. */
-    .sheet-btn {
-      width: 34px;
+    .btn:disabled { opacity: 0.55; }
+    .card > .btn { flex: none; }
+    .btn-sm { min-height: 44px; padding: 10px 14px; font-size: 14px; }
+    .btn-fit { flex: 0 0 auto; padding-left: 18px; padding-right: 18px; }
+    .btn-mint { background: var(--mint); color: var(--ink); }
+    .btn-mint:active { background: var(--mint-press); }
+    .btn-dark { background: var(--btn-dark); color: #fff; }
+    .btn-dark:active { background: var(--btn-dark-press); }
+    .btn-soft { background: var(--fill); color: var(--ink); }
+    .btn-soft:active { background: #EAEAEA; }
+    .btn-outline { background: var(--surface); border-color: var(--line); color: var(--ink); }
+    .btn-outline:active { background: var(--fill); }
+    .btn-mint-soft { background: var(--mint-soft); color: var(--ink); }
+    .btn-mint-soft:active { background: #C8F6DA; }
+
+    /* Серия листов 2/3/4 — «места», как выбор кресла: квадраты той же высоты, что «Фото». */
+    .seat {
+      flex: 0 0 52px;
+      width: 52px;
       padding: 0;
-      border: none;
-      border-radius: 12px;
-      background: #FFF3E0;
-      color: #F57C00;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: var(--font);
-      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      border-radius: var(--r-btn);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
     }
-    .sheet-btn:active { background: #FFE0B2; }
-    .btn-primary { background: #7B61FF; color: #fff; }
-    .btn-secondary { background: #F0EDFF; color: #7B61FF; display: block; }
+    .seat:active { background: var(--fill); }
+    /* «Снимок 2 из 3» не влезает рядом с тремя квадратами при обычных полях. */
+    #shootBtn[data-state="series"] { background: var(--btn-dark); color: #fff; padding-left: 8px; padding-right: 8px; font-size: 14px; white-space: nowrap; }
 
-    .status {
-      display: none;
+    /* ---------- Голос ---------- */
+    .voice { display: flex; flex-direction: column; gap: 10px; }
+    .voice > .btn { flex: none; }
+    /* Панель записи: полоски голоса и две кнопки — ■ отменить, ↑ отправить.
+       Цвета и скругления — общие для всего сайта. */
+    .voice-panel {
+      display: flex;
       flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      background: var(--fill);
+      border-radius: var(--r-btn);
+    }
+    .voice-wave { display: block; width: 100%; height: 40px; }
+    .voice-controls { display: flex; justify-content: flex-end; gap: 8px; }
+    .voice-ctl {
+      width: 52px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: var(--r-btn);
+      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 16px;
-      padding: 30px 20px;
-      width: 100%;
-      max-width: 400px;
     }
-    .spinner {
-      width: 32px; height: 32px;
-      border: 3px solid #EAEAF2;
-      border-top-color: #7B61FF;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    .voice-ctl-left { background: var(--surface); border-color: var(--line); }
+    .voice-ctl-left:active { background: var(--fill); }
+    .voice-ctl-right { background: var(--mint); }
+    .voice-ctl-right:active { background: var(--mint-press); }
+    .voice-ctl:disabled { opacity: 0.4; }
+    .voice-ctl .vi {
+      width: 16px;
+      height: 16px;
+      background-color: var(--ink);
+      -webkit-mask: var(--vi) center / contain no-repeat;
+      mask: var(--vi) center / contain no-repeat;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .status-text { display: none; }
+    .voice-ctl[data-icon="stop"] { --vi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3.5' y='3.5' width='9' height='9' rx='1' fill='black'/%3E%3C/svg%3E"); }
+    .voice-ctl[data-icon="send"] { --vi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 13V3.5M3.5 8L8 3.5 12.5 8'/%3E%3C/svg%3E"); }
+    .voice-log { font-size: 12px; color: var(--danger); line-height: 1.45; word-break: break-word; padding: 0 2px; }
 
+    /* ---------- Ответ ---------- */
+    .actions { width: 100%; max-width: var(--col); margin: 12px 0 10px; }
+    #halfBtns { margin-top: 8px; }
+    /* Отступ до карточек заданий задаёт сам список: под «Фото» ответы голосом стоят сразу за
+       карточкой, и раньше там оставалось 2px. Шапка номеров своего нижнего отступа не добавляет,
+       иначе у заданий с фото промежуток выходил бы вдвое больше. */
+    #tasksHeader { margin-bottom: 0; }
     .result-card {
       display: none;
-      background: #fff;
-      border-radius: 16px;
-      padding: 16px 16px 12px;
       width: 100%;
-      max-width: 400px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
-      border: 1px solid #EAEAF2;
+      max-width: var(--col);
+      background: var(--surface);
+      border-radius: var(--r-card);
+      padding: 16px;
       position: relative;
     }
-    .result-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .result-label {
-      font-size: 13px;
-      font-weight: 700;
-      color: #7B61FF;
-    }
-    
-    .result-cost {
-      font-size: 11px;
-      color: #999;
-      margin-top: 8px;
-      text-align: right;
-    }
-    .result-text {
-      font-size: 15px;
-      line-height: 1.6;
-      color: #111;
-      white-space: pre-wrap;
-    }
+    .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .result-label { font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 8px; }
+    .result-header .result-label { margin-bottom: 0; }
+    .result-text { font-size: 15px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+    .result-cost { font-size: 11px; color: var(--muted); margin-top: 8px; text-align: right; }
+    .result-cost:empty { display: none; }
 
-    .tasks-list { display:none; flex-direction:column; gap:12px; width:100%; max-width:400px; margin-top:10px; }
+    /* ---------- Номера заданий — сетка «мест» ---------- */
+    .seat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; margin-bottom: 10px; }
+    .task-btn {
+      aspect-ratio: 1 / 1;
+      min-height: 44px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--r-btn);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .task-btn:active { background: var(--fill); }
+    .task-btn[data-state="sending"] { background: var(--btn-dark); border-color: var(--btn-dark); color: #fff; }
+    .task-btn[data-state="done"] { background: var(--mint); border-color: var(--mint); color: var(--ink); }
+    .task-btn[data-state="error"] { background: var(--danger-soft); border-color: var(--danger-soft); color: var(--danger); }
+
+    .tasks-list { display: none; flex-direction: column; gap: 10px; width: 100%; max-width: var(--col); margin-top: 12px; }
     .task-card {
-      background:#fff;
-      border-radius:16px;
-      padding:16px 16px 12px;
-      border:1px solid #EAEAF2;
-      position:relative;
-      box-shadow:0 4px 16px rgba(0,0,0,0.03);
-      display:flex;
-      flex-direction:column;
-      gap:10px;
+      background: var(--surface);
+      border-radius: var(--r-card);
+      padding: 14px 16px 16px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-    .task-num {
-      font-size:13px;
-      font-weight:700;
-      color:#7B61FF;
-    }
-    .task-text {
-      font-size:15px;
-      line-height:1.6;
-      color:#111;
-      white-space:pre-wrap;
-    }
+    .task-num { font-size: 12px; font-weight: 500; color: var(--muted); }
+    /* Буква пункта в подписи «1 (а)» — серая и на кнопке, и на карточке. */
+    .task-sub { color: var(--muted); font-weight: 500; }
+    .task-text { font-size: 15px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+    .heard { font-size: 12px; color: var(--muted); line-height: 1.4; word-break: break-word; }
 
+    /* ---------- Ожидание ответа: заготовки карточек ---------- */
+    /* Пока модель думает, на месте будущих заданий стоят серые заготовки с мягким переливом —
+       видно, что работа идёт, и первая настоящая карточка встаёт ровно туда же. */
+    .loading-cards { display: none; flex-direction: column; gap: 10px; width: 100%; max-width: var(--col); margin-top: 12px; }
+    .skeleton-card { background: var(--surface); border-radius: var(--r-card); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .skeleton-line {
+      height: 12px;
+      border-radius: var(--r-btn);
+      background: linear-gradient(90deg, var(--fill) 25%, #E6E6E6 50%, var(--fill) 75%);
+      background-size: 300% 100%;
+      animation: skeleton-wave 1.5s ease-in-out infinite;
+    }
+    .skeleton-line.sk-label { width: 18%; height: 10px; background-color: var(--mint-soft); background-image: none; animation: none; }
+    .skeleton-line.sk-90 { width: 90%; }
+    .skeleton-line.sk-70 { width: 70%; }
+    .skeleton-line.sk-50 { width: 50%; }
+    @keyframes skeleton-wave { from { background-position: 100% 0; } to { background-position: 0 0; } }
+    @media (prefers-reduced-motion: reduce) { .skeleton-line { animation: none; } }
+
+    /* ---------- Ошибка ---------- */
     .error-card {
       display: none;
-      background: #fff;
-      border-radius: 16px;
-      padding: 20px;
       width: 100%;
-      max-width: 400px;
-      border: 1px solid #FFEEEE;
-      margin-top: 10px;
+      max-width: var(--col);
+      margin-top: 12px;
+      background: var(--surface);
+      border-radius: var(--r-card);
+      padding: 14px 16px 16px;
     }
-    .error-text { font-size: 14px; color: #FF453A; line-height: 1.5; font-weight: 500; }
+    .error-label { color: var(--danger); }
+    .error-text { font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+    .retry-btn {
+      width: 32px; height: 32px;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border: none;
+      border-radius: var(--r-btn);
+      background: var(--fill);
+      color: var(--ink);
+    }
+    .retry-btn:active { background: #E6E6E6; }
 
-
+    /* ---------- Настройки: серая шторка с белыми карточками строк ---------- */
     .modal-overlay {
       display: none;
       position: fixed; inset: 0;
-      background: rgba(0,0,0,0.4);
       z-index: 100;
+      background: rgba(0, 0, 0, 0.35);
       align-items: flex-end;
       justify-content: center;
     }
     .modal-overlay.open { display: flex; }
     .modal {
-      background: #fff;
-      border-radius: 20px 20px 0 0;
-      padding: 28px 20px 40px;
       width: 100%;
-      max-width: 400px;
+      max-width: var(--col);
+      max-height: 92vh;
+      overflow-y: auto;
+      background: var(--bg);
+      border-radius: 8px 8px 0 0;
+      padding: 8px 16px calc(24px + env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    .modal-title { font-size: 18px; font-weight: 800; font-family: var(--font-d); margin-bottom: 20px; }
-    .modal-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #EAEAF2; font-size: 15px; }
-    .modal-row:last-child { border-bottom: none; }
-    .modal-val { color: #7B61FF; font-weight: 600; }
-    .modal-close { width: 100%; padding: 14px; background: #F0EDFF; color: #7B61FF; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 20px; font-family: var(--font); }
+    .grabber { width: 36px; height: 4px; border-radius: 2px; background: #D0D0D0; margin: 0 auto; }
+    .modal-title { text-align: center; font-size: 16px; font-weight: 600; padding: 2px 0; }
+    .modal-group { background: var(--surface); border-radius: var(--r-card); padding: 0 16px; }
+    .modal-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      min-height: 52px;
+      padding: 8px 0;
+      border-top: 1px solid var(--divider);
+    }
+    .modal-group .modal-row:first-child { border-top: none; }
+    .modal-key { font-size: 13px; color: var(--muted); }
+    .modal-block {
+      background: var(--surface);
+      border-radius: var(--r-card);
+      padding: 14px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .field-pill {
+      height: 34px;
+      padding: 0 32px 0 12px;
+      border: none;
+      border-radius: var(--r-btn);
+      background-color: var(--fill);
+      background-image: var(--i-chevron-down);
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 14px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 600;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+    }
+    .pill-btn {
+      height: 34px;
+      padding: 0 16px;
+      border: none;
+      border-radius: var(--r-btn);
+      background: var(--btn-dark);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    #notifBtn[data-state="on"] { background: var(--mint-soft); color: var(--ink); }
+    #notifBtn[data-state="blocked"] { background: var(--danger-soft); color: var(--danger); }
+    .field {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid transparent;
+      border-radius: var(--r-btn);
+      background: var(--fill);
+      color: var(--ink);
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      outline: none;
+      resize: vertical;
+    }
+    .field:focus { border-color: var(--line); background: var(--surface); }
+    .keys-status { font-size: 12px; line-height: 1.4; color: var(--danger); }
+    .keys-status:empty { display: none; }
+    .modal .btn { flex: none; }
+    .modal-close { width: 100%; }
 
-    #photoScreen { display:flex; flex-direction:column; align-items:center; width:100%; }
+    /* Между листами серии весь экран — одна кнопка «снять следующий»: на iPhone камеру
+       открывает только нажатие, и так до него не нужно тянуться. */
+    .shot-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      z-index: 90;
+      background: var(--bg);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .shot-overlay.open { display: flex; }
+    .shot-count { font-size: 56px; font-weight: 600; line-height: 1; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+    .shot-hint { max-width: 280px; font-size: 14px; line-height: 1.45; color: var(--muted); margin-bottom: 14px; }
+    .shot-open { flex: none; width: 100%; max-width: 320px; }
+    .shot-cancel {
+      position: absolute;
+      left: 0; right: 0;
+      bottom: calc(24px + env(safe-area-inset-bottom));
+      width: max-content;
+      margin: 0 auto;
+      padding: 10px 16px;
+      border: none;
+      border-radius: var(--r-btn);
+      background: transparent;
+      color: var(--ink-2);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    #photoScreen { display: flex; flex-direction: column; align-items: center; width: 100%; }
   </style>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraph.css">
   <script src="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraphcore.js"></script>
   <style>
-    #geoBoard { width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden; margin-top:12px; display:none; background:#fff; border:1.5px solid #EAEAF2; }
-    .jxgbox { border-radius:12px !important; }
+    #geoBoard { width: 100%; aspect-ratio: 1 / 1; border-radius: 3px; overflow: hidden; margin-top: 12px; display: none; background: #fff; border: 1px solid var(--line); }
+    .jxgbox { border-radius: 3px !important; }
   </style>
 </head>
 <body>
 
   <header>
-    <a href="https://dophamine2.github.io/taskai/" style="text-decoration:none;color:inherit;display:flex;align-items:baseline;gap:5px"><div class="logo">Tutor</div><span style="font-size:11px;color:#bbb;font-family:var(--font);font-weight:500">v57</span></a>
-    <div style="display:flex;align-items:center;gap:8px">
-      <button id="modelBtn" onclick="toggleModel()" style="padding:4px 10px;border-radius:8px;border:1px solid #EAEAF2;background:#FFF3E0;color:#F57C00;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">Flash</button>
-      <div class="settings-icon" onclick="openSettingsForTab()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-      </div>
-    </div>
+    <button class="icon-btn" onclick="openSettingsForTab()" aria-label="Настройки">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+    </button>
+    <a class="brand" href="https://dophamine2.github.io/taskai/"><span class="logo">Tutor</span><span class="version">v82</span></a>
+    <button id="modelBtn" class="pill" data-state="flash" onclick="toggleModel()">Gemini</button>
   </header>
 
   <div id="photoScreen">
@@ -243,61 +455,65 @@
   <input type="file" accept="image/*" multiple id="gallery" style="display:none" onchange="onPhotoInput(this)">
 
   <div class="card">
-    <div style="display:flex;gap:8px;align-items:stretch;width:100%">
-      <button class="btn btn-primary" id="shootBtn" onclick="shootButtonAction()" style="flex:1;margin:0">Фото</button>
-      <button class="btn btn-primary" id="againBtn" onclick="startShooting(1)" style="flex:1;margin:0;display:none">Фото</button>
-      <button class="sheet-btn" onclick="startShooting(2)" title="2 листа">2</button>
-      <button class="sheet-btn" onclick="startShooting(3)" title="3 листа">3</button>
-      <button class="sheet-btn" onclick="startShooting(4)" title="4 листа">4</button>
+    <div class="row">
+      <button class="btn btn-mint" id="shootBtn" onclick="shootButtonAction()">Фото</button>
+      <button class="btn btn-mint" id="againBtn" onclick="startShooting(1)" style="display:none">Фото</button>
+      <button class="seat" onclick="startShooting(2)" title="2 листа">2</button>
+      <button class="seat" onclick="startShooting(3)" title="3 листа">3</button>
+      <button class="seat" onclick="startShooting(4)" title="4 листа">4</button>
     </div>
-    <button class="btn btn-secondary" id="galleryBtn" onclick="document.getElementById('gallery').click()">Загрузить из галереи</button>
-    <button class="btn btn-secondary" id="galleryBtn2" onclick="document.getElementById('gallery').click()" style="display:none">Загрузить из галереи</button>
-    <button class="btn" id="savePhotoBtn" onclick="savePhoto()" style="display:none;background:#FFF3E0;color:#F57C00;font-weight:600">Скачать фото</button>
-    <div id="voiceGroup" style="display:none;gap:8px">
-      <button class="btn" id="voiceBtn" onclick="toggleVoice()" style="flex:1;background:#E8F5E9;color:#2E7D32;font-weight:600">
-        <span id="voiceBtnText">Голосовой ввод</span>
-      </button>
-      <button id="voiceCancelBtn" onclick="cancelVoice()" style="display:none;padding:16px 18px;border:none;border-radius:12px;background:#FFE0E0;color:#FF453A;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Остановить</button>
+    <button class="btn btn-soft btn-sm" id="galleryBtn" onclick="document.getElementById('gallery').click()">Загрузить из галереи</button>
+    <button class="btn btn-soft btn-sm" id="galleryBtn2" onclick="document.getElementById('gallery').click()" style="display:none">Загрузить из галереи</button>
+    <button class="btn btn-soft btn-sm" id="savePhotoBtn" onclick="savePhoto()" style="display:none">Скачать фото</button>
+    <div id="voiceGroup" class="voice" style="display:none">
+      <button class="btn btn-dark" id="voiceBtn" onclick="startVoice()">Голосовой ввод</button>
+      <div class="voice-panel" id="voicePanel" style="display:none" ontouchend="event.stopPropagation()">
+        <canvas class="voice-wave" id="voiceWave"></canvas>
+        <div class="voice-controls">
+          <button class="voice-ctl voice-ctl-left" id="voiceLeftBtn" data-icon="stop" aria-label="Отменить запись" onclick="voiceLeftAction()"><span class="vi"></span></button>
+          <button class="voice-ctl voice-ctl-right" id="voiceRightBtn" data-icon="send" aria-label="Отправить" onclick="voiceRightAction()" disabled><span class="vi"></span></button>
+        </div>
+      </div>
+      <div id="voiceRecognizedText" class="voice-log" style="display:none"></div>
     </div>
-    <div id="voiceRecognizedText" style="display:none;font-size:12px;color:#999;padding:6px 2px 0;word-break:break-word;line-height:1.4"></div>
   </div>
 
-  <div class="status" id="status">
-    <div class="spinner"></div>
-    <span class="status-text" id="statusText">Анализирую...</span>
+  <div class="loading-cards" id="loadingCards" role="status" aria-label="Решаю задания">
+    <div class="skeleton-card"><div class="skeleton-line sk-label"></div><div class="skeleton-line sk-90"></div><div class="skeleton-line sk-70"></div><div class="skeleton-line sk-50"></div></div>
+    <div class="skeleton-card"><div class="skeleton-line sk-label"></div><div class="skeleton-line sk-90"></div><div class="skeleton-line sk-50"></div></div>
   </div>
 
-  <div id="resultHeader" style="display:none;width:100%;max-width:400px;margin-bottom:10px">
-    <div style="display:flex;gap:8px">
-      <button onclick="resendToWatch()" id="resultResendBtn" style="flex:1;padding:14px;border:none;border-radius:12px;background:#7B61FF;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);display:none">Отправить</button>
-      <button onclick="regenerate()" id="regenBtn" style="flex:1;padding:14px;border:none;border-radius:12px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Заново</button>
+  <div id="resultHeader" class="actions" style="display:none">
+    <div class="row">
+      <button class="btn btn-mint" id="resultResendBtn" onclick="resendToWatch()" style="display:none">Отправить</button>
+      <button class="btn btn-outline" id="regenBtn" onclick="regenerate()">Заново</button>
     </div>
-    <div id="halfBtns" style="display:none;gap:8px;margin-top:8px">
-      <button onclick="sendHalf(1)" id="half1Btn" style="flex:1;padding:12px;border:none;border-radius:12px;background:#FFF3E0;color:#F57C00;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font)">1-я половина</button>
-      <button onclick="sendHalf(2)" id="half2Btn" style="flex:1;padding:12px;border:none;border-radius:12px;background:#FFF3E0;color:#F57C00;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font)">2-я половина</button>
+    <div id="halfBtns" class="row" style="display:none">
+      <button class="btn btn-mint-soft btn-sm" id="half1Btn" onclick="sendHalf(1)">1-я половина</button>
+      <button class="btn btn-mint-soft btn-sm" id="half2Btn" onclick="sendHalf(2)">2-я половина</button>
     </div>
   </div>
-  <div class="result-card" id="resultCard" style="position:relative">
-    <div class="result-label" style="margin-bottom:10px">Ответ</div>
+  <div class="result-card" id="resultCard">
+    <div class="result-label">Ответ</div>
     <div class="result-text" id="resultText"></div>
     <div id="geoBoard"></div>
     <div class="result-cost" id="resultCost"></div>
   </div>
 
-  <div id="tasksHeader" style="display:none;width:100%;max-width:400px;margin-top:10px;margin-bottom:10px">
-    <div id="taskBtnsBar" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
-    <div style="display:flex;gap:8px">
-      <button onclick="autoSendAllTasks(lastTasks)" style="flex:1;padding:14px;border:none;border-radius:12px;background:#7B61FF;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Отправить все</button>
-      <button onclick="regenerate()" style="padding:14px 18px;border:none;border-radius:12px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font)">Заново</button>
+  <div id="tasksHeader" class="actions" style="display:none">
+    <div id="taskBtnsBar" class="seat-grid"></div>
+    <div class="row">
+      <button class="btn btn-mint" onclick="autoSendAllTasks(lastTasks)">Отправить все</button>
+      <button class="btn btn-outline btn-fit" onclick="regenerate()">Заново</button>
     </div>
   </div>
   <div class="tasks-list" id="tasksList"></div>
 
   <div class="error-card" id="errorCard">
     <div class="result-header">
-      <div class="result-label">Ошибка</div>
-      <button onclick="regenerate()" title="Повторить" style="width:28px;height:28px;border-radius:50%;border:none;background:#F0EDFF;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#7B61FF;flex-shrink:0">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+      <div class="result-label error-label">Ошибка</div>
+      <button class="retry-btn" onclick="regenerate()" title="Повторить" aria-label="Повторить">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M18 2.5v4h-4"/></svg>
       </button>
     </div>
     <div class="error-text" id="errorText"></div>
@@ -305,65 +521,71 @@
   </div>
 
   <select class="model-select" id="modelSelect" onchange="onModelChange(this.value)" style="display:none">
-    <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
-    <option value="google/gemini-3.5-flash" selected>Gemini 3.5 Flash</option>
+    <option value="anthropic/claude-opus-5">Claude Opus 5</option>
+    <option value="google/gemini-3.8-flash" selected>Gemini 3.8 Flash</option>
   </select>
+  <div class="shot-overlay" id="shotOverlay" onclick="continueShooting()" ontouchend="event.stopPropagation()">
+    <div class="shot-count" id="shotCount"></div>
+    <div class="shot-hint" id="shotHint"></div>
+    <button class="btn btn-dark shot-open" type="button">Открыть камеру</button>
+    <button class="shot-cancel" type="button" onclick="event.stopPropagation(); cancelShooting()">Отменить серию</button>
+  </div>
   <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
     <div class="modal">
+      <div class="grabber"></div>
       <div class="modal-title">Настройки</div>
-      <div class="modal-row">
-        <span>Предмет</span>
-        <select id="subjectSelect" onchange="switchSubject(this.value)" style="padding:6px 12px;border-radius:8px;border:1px solid #EAEAF2;background:#F8F9FB;color:#111;font-size:14px;font-weight:600;font-family:var(--font);outline:none;cursor:pointer;text-align:center;text-align-last:center">
-          <option value="other" selected>Другое</option>
-          <option value="society">Обществознание</option>
-          <option value="algebra">Алгебра</option>
-          <option value="geometry">Геометрия</option>
-          <option value="probability">Вероятность</option>
-          <option value="physics">Физика</option>
-          <option value="history">История</option>
-          <option value="russian">Русский</option>
-        </select>
+      <div class="modal-group">
+        <div class="modal-row">
+          <span class="modal-key">Предмет</span>
+          <select id="subjectSelect" class="field-pill" onchange="switchSubject(this.value)">
+            <option value="other" selected>Другое</option>
+            <option value="society">Обществознание</option>
+            <option value="algebra">Алгебра</option>
+            <option value="geometry">Геометрия</option>
+            <option value="probability">Вероятность</option>
+            <option value="physics">Физика</option>
+            <option value="history">История</option>
+            <option value="russian">Русский</option>
+          </select>
+        </div>
+        <div class="modal-row" id="micRow" style="display:none">
+          <span class="modal-key">Микрофон</span>
+          <select id="micSelect" class="field-pill" onchange="onMicChange(this.value)" style="max-width:180px"></select>
+        </div>
+        <div class="modal-row">
+          <span class="modal-key">Уведомления</span>
+          <button id="notifBtn" class="pill-btn" data-state="off" onclick="requestNotifPermission()">Вкл</button>
+        </div>
       </div>
-      <div class="modal-row" id="micRow" style="display:none">
-        <span>Микрофон</span>
-        <select id="micSelect" onchange="onMicChange(this.value)" style="padding:6px 12px;border-radius:8px;border:1px solid #EAEAF2;background:#F8F9FB;color:#111;font-size:14px;font-weight:600;font-family:var(--font);outline:none;cursor:pointer;max-width:180px"></select>
+      <div class="modal-block">
+        <span class="modal-key">Ключ Polza</span>
+        <textarea id="keysInput" class="field" rows="2" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="pza_..."></textarea>
+        <button class="btn btn-soft btn-sm" onclick="saveApiKeys()">Сохранить ключ</button>
+        <span id="keysStatus" class="keys-status"></span>
       </div>
-      <div class="modal-row">
-        <span>Уведомления</span>
-        <button id="notifBtn" onclick="requestNotifPermission()" style="padding:6px 18px;border-radius:8px;border:none;background:#F0EDFF;color:#7B61FF;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">Вкл</button>
-      </div>
-      <div class="modal-row" style="flex-direction:column;align-items:stretch;gap:8px">
-        <span>Ключи API (JSON)</span>
-        <textarea id="keysInput" rows="5" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder='{
-  "polza": "pza_...",
-  "google": "AQ..."
-}' style="padding:9px 12px;border-radius:8px;border:1px solid #EAEAF2;background:#F8F9FB;color:#111;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;outline:none;width:100%;box-sizing:border-box;resize:vertical"></textarea>
-        <button onclick="saveApiKeys()" style="padding:9px 18px;border-radius:8px;border:none;background:#F0EDFF;color:#7B61FF;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">Сохранить ключи</button>
-        <span id="keysStatus" style="font-size:12px;color:#999;line-height:1.4"></span>
-      </div>
-      <button class="modal-close" onclick="document.getElementById('settingsModal').classList.remove('open')">Готово</button>
+      <button class="btn btn-dark modal-close" onclick="document.getElementById('settingsModal').classList.remove('open')">Готово</button>
     </div>
   </div>
 
-
   <script>
-    // Бекэнда больше нет: страница ходит в Polza и Google сама. Ключи поэтому лежат
-    // только в localStorage этого устройства — в исходнике страницы их нет, и публичный
+    // Бекэнда больше нет: страница ходит в Polza сама. Ключ поэтому лежит только
+    // в localStorage этого устройства — в исходнике страницы его нет, и публичный
     // репозиторий на GitHub Pages не выдаёт ничего, что можно было бы утащить сканером.
+    // Ключ один — Polza: все модели идут через неё, ключ Google больше не нужен.
     const KEYS_STORAGE = 'tutorApiKeys'
-    let apiKeys = { polza: '', google: '' }
+    let apiKeys = { polza: '' }
 
     function loadApiKeys() {
       try {
         const saved = JSON.parse(localStorage.getItem(KEYS_STORAGE) || '{}')
-        apiKeys = { polza: saved.polza || '', google: saved.google || '' }
-      } catch { apiKeys = { polza: '', google: '' } }
+        apiKeys = { polza: (saved && typeof saved.polza === 'string') ? saved.polza : '' }
+      } catch { apiKeys = { polza: '' } }
       const box = document.getElementById('keysInput')
-      if (box) box.value = (apiKeys.polza || apiKeys.google) ? JSON.stringify(apiKeys, null, 2) : ''
+      if (box) box.value = apiKeys.polza
       updateKeysStatus()
     }
 
-    // Имя ключа принимаем в любом привычном написании — и короткое, и такое же, как
+    // Имя ключа в JSON принимаем в любом привычном написании — и короткое, и такое же, как
     // в переменных окружения сервера, чтобы можно было вставить что под рукой.
     function pickKey(obj, names) {
       for (const name of names) {
@@ -373,29 +595,35 @@
       return ''
     }
 
+    // Вставляется сам ключ (pza_...). Старый JSON вида {"polza": "..."} тоже понимаем —
+    // из него берём только ключ Polza.
     function saveApiKeys() {
       const el = document.getElementById('keysStatus')
-      const raw = document.getElementById('keysInput').value.trim()
+      const box = document.getElementById('keysInput')
+      const raw = box.value.trim()
       if (!raw) {
-        apiKeys = { polza: '', google: '' }
+        apiKeys = { polza: '' }
         try { localStorage.removeItem(KEYS_STORAGE) } catch {}
         updateKeysStatus()
         return
       }
-      let parsed
-      try { parsed = JSON.parse(raw) } catch (e) {
-        el.textContent = 'Это не JSON: ' + e.message
-        return
+      let key = raw
+      if (raw.startsWith('{')) {
+        let parsed
+        try { parsed = JSON.parse(raw) } catch (e) {
+          el.textContent = 'Это не JSON: ' + e.message
+          return
+        }
+        key = (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+          ? pickKey(parsed, ['polza', 'polza_api_key', 'polzakey', 'polza_key'])
+          : ''
+        if (!key) { el.textContent = 'В JSON нет ключа Polza'; return }
       }
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        el.textContent = 'Ожидается объект вида {"polza": "...", "google": "..."}'
-        return
-      }
-      apiKeys = {
-        polza: pickKey(parsed, ['polza', 'polza_api_key', 'polzakey', 'polza_key']),
-        google: pickKey(parsed, ['google', 'google_api_key', 'googlekey', 'google_key', 'gemini'])
-      }
+      // Пробелов и переносов в ключе не бывает — это следы копирования.
+      key = key.replace(/\s+/g, '')
+      apiKeys = { polza: key }
       try { localStorage.setItem(KEYS_STORAGE, JSON.stringify(apiKeys)) } catch {}
+      box.value = key
       updateKeysStatus()
     }
 
@@ -420,11 +648,11 @@
       const btn = document.getElementById('notifBtn')
       if (!('Notification' in window)) { btn.parentElement.style.display = 'none'; return }
       if (Notification.permission === 'granted') {
-        btn.textContent = 'Вкл'; btn.style.background = '#E8F5E9'; btn.style.color = '#2E7D32'; btn.disabled = true
+        btn.textContent = 'Вкл'; btn.dataset.state = 'on'; btn.disabled = true
       } else if (Notification.permission === 'denied') {
-        btn.textContent = 'Заблокировано'; btn.style.background = '#FFE0E0'; btn.style.color = '#FF453A'; btn.disabled = true
+        btn.textContent = 'Заблокировано'; btn.dataset.state = 'blocked'; btn.disabled = true
       } else {
-        btn.textContent = 'Вкл'; btn.style.background = '#F0EDFF'; btn.style.color = '#7B61FF'; btn.disabled = false
+        btn.textContent = 'Вкл'; btn.dataset.state = 'off'; btn.disabled = false
       }
     }
 
@@ -493,8 +721,7 @@
       return out.replace(/ {2,}/g, ' ')
     }
 
-    // Готовим куски для часов, но не отправляем: так их можно послать целиком,
-    // а можно половинами.
+    // Готовим части для часов, но не отправляем: так их можно послать целиком, а можно половинами.
     function watchChunks(body) {
       // Звёздочку умножения переводим в · ДО вырезания markdown: иначе следующая строка
       // съедала её вместе с разметкой, и на часы приходило «0,3 0,02» вместо «0,3 · 0,02».
@@ -502,58 +729,160 @@
       // Умножение отличаем от markdown по симметрии пробелов: у «5 * 3» и «m*a» они
       // одинаковые с обеих сторон, а у курсива «*слово*» — нет. Просмотр вперёд (?=)
       // не съедает следующий символ, иначе в цепочке «a * b * c» терялась средняя звёздочка.
-      const withMul = body
+      const withMul = String(body)
         .replace(/([\d)a-zA-Zа-яА-Я]) \* (?=[\d(a-zA-Zа-яА-Я])/g, '$1 · ')
         .replace(/([\d)a-zA-Zа-яА-Я])\*(?=[\d(a-zA-Zа-яА-Я])/g, '$1·')
-      let text = toWatchText(withMul.replace(/\*\*/g, '').replace(/\*/g, '').replace(/#{1,6}\s/g, '').trim())
-      // Часы обрезают длинные уведомления, поэтому режем сами, по 150 символов.
-      const CHUNK = 150
-      // Переносить стоит только во второй половине куска: иначе один ранний перенос
-      // строки резал текст на множество огрызков.
-      const MIN_BREAK = Math.floor(CHUNK * 0.6)
-      const raw = []
-      while (text.length > 0) {
-        let end = Math.min(CHUNK, text.length)
-        if (end < text.length) {
-          // Рвать лучше по концу строки: тогда «Дано», «Решение» и «Ответ» не
-          // разрезаются посередине и каждое сообщение остаётся осмысленным куском.
-          const ln = text.lastIndexOf('\n', end)
-          const ls = text.lastIndexOf(' ', end)
-          if (ln >= MIN_BREAK) end = ln
-          else if (ls >= MIN_BREAK) end = ls
-        }
-        raw.push(text.substring(0, end).trim())
-        text = text.substring(end).trim()
+      const text = toWatchText(withMul.replace(/\*\*/g, '').replace(/\*/g, '').replace(/#{1,6}\s/g, '').trim())
+      // Пустые строки и пробелы по краям строк на часах только съедают место.
+      return splitForWatch(text.split('\n').map(l => l.trim()).filter(Boolean).join('\n'))
+    }
+
+    // Часы обрезают длинные уведомления, поэтому режем сами — не длиннее WATCH_PART_MAX.
+    // Части выходят примерно равными: жадная нарезка давала «…= 10», а через полминуты огрызок
+    // «см. Ответ: 10 см». Рвём по концу строки, потом по концу фразы, потом по запятой и только
+    // потом по пробелу между словами — но никогда между числом и единицей и не посреди формулы.
+    const WATCH_PART_MAX = 150
+
+    function splitForWatch(text) {
+      const parts = []
+      let rest = text
+      while (rest.length > WATCH_PART_MAX) {
+        const pieces = Math.ceil(rest.length / WATCH_PART_MAX)
+        const ideal = Math.ceil(rest.length / pieces)
+        const end = watchBreak(rest, Math.max(30, Math.floor(ideal * 0.55)), ideal)
+        parts.push(rest.slice(0, end).trim())
+        rest = rest.slice(end).trim()
       }
-      return raw
+      if (rest) parts.push(rest)
+      return parts
     }
 
-    // Отправка готовых кусков. offset и total нужны, чтобы номер части в заголовке
-    // считался от всего ответа, даже когда шлём только его половину.
-    function sendChunks(title, chunks, offset, total) {
-      if (!('Notification' in window) || Notification.permission !== 'granted') return
-      chunks.forEach((chunk, i) => {
-        const chunkTitle = total > 1 ? `${title} ч.${offset + i + 1}/${total}` : title
-        setTimeout(() => {
-          try { new Notification(chunkTitle, { body: chunk, silent: i > 0 }) } catch {}
-        }, i * 500)
-      })
+    // Место разрыва в пределах [lo, WATCH_PART_MAX]: лучший вид разрыва, ближайший к ideal.
+    function watchBreak(text, lo, ideal) {
+      const hi = Math.min(WATCH_PART_MAX, text.length)
+      // перенос строки, конец фразы, запятая, пробел между словами
+      const kinds = [[], [], [], []]
+      for (let i = lo; i <= hi; i++) {
+        const ch = text[i]
+        if (ch === '\n') { kinds[0].push(i); continue }
+        if (ch !== ' ') continue
+        const before = text[i - 1] || ''
+        const after = text[i + 1] || ''
+        if (/[.;!?]/.test(before)) kinds[1].push(i)
+        else if (before === ',') kinds[2].push(i)
+        else if (!/[\d=+\-·×\/(:°%²³]/.test(before) && !/[\d=+\-·×\/)%²³]/.test(after)) kinds[3].push(i)
+      }
+      for (const list of kinds) {
+        if (list.length) return list.reduce((best, p) => (Math.abs(p - ideal) < Math.abs(best - ideal) ? p : best))
+      }
+      const anySpace = text.lastIndexOf(' ', hi)
+      return anySpace > 0 ? anySpace : hi
     }
 
-    function browserNotify(title, body) {
-      const chunks = watchChunks(body)
-      sendChunks(title, chunks, 0, chunks.length)
+    // Все уведомления уходят на часы по одному: между любыми двумя — не меньше WATCH_MIN_GAP_MS,
+    // в порядке отправки. Приложения, которые пересылают уведомления на часы, теряют те, что
+    // пришли почти одновременно, — например, ответ голосом в ту же секунду, что часть задания.
+    const WATCH_MIN_GAP_MS = 4000
+    const watchOutbox = []
+    let watchOutboxTimer = null
+    let lastWatchShownAt = -Infinity
+
+    // Поставить уведомление в очередь показа. owner — чьё оно: остановленная отправка убирает
+    // из очереди свои ещё не показанные уведомления. false — уведомления не разрешены.
+    function showWatchNotification(title, body, owner) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return false
+      watchOutbox.push({ title, body, owner })
+      pumpWatchOutbox()
+      return true
+    }
+
+    function purgeWatchOutbox(owner) {
+      for (let i = watchOutbox.length - 1; i >= 0; i--) {
+        if (watchOutbox[i].owner === owner) watchOutbox.splice(i, 1)
+      }
+    }
+
+    function pumpWatchOutbox() {
+      if (watchOutboxTimer || !watchOutbox.length) return
+      const wait = lastWatchShownAt + WATCH_MIN_GAP_MS - Date.now()
+      if (wait > 0) {
+        watchOutboxTimer = setTimeout(() => { watchOutboxTimer = null; pumpWatchOutbox() }, wait)
+        return
+      }
+      const { title, body } = watchOutbox.shift()
+      lastWatchShownAt = Date.now()
+      displayWatchNotification(title, body)
+      pumpWatchOutbox()
+    }
+
+    // Показ одного уведомления. Сначала через сервис-воркер: в приложении на экране iPhone
+    // и в Chrome на Android уведомления со страницы показываются именно так, а конструктор
+    // Notification там не работает или запрещён. Конструктор — запасной путь. Со звуком
+    // всегда: беззвучное уведомление на часах легко пропустить.
+    function displayWatchNotification(title, body) {
+      const options = { body, silent: false }
+      const viaConstructor = () => { try { new Notification(title, options) } catch {} }
+      const sw = typeof navigator !== 'undefined' ? navigator.serviceWorker : null
+      if (!sw || typeof sw.getRegistration !== 'function') { viaConstructor(); return }
+      sw.getRegistration()
+        .then(reg => (reg && reg.showNotification ? reg.showNotification(title, options) : viaConstructor()))
+        .catch(viaConstructor)
+    }
+
+    // Заголовок на часах — коротко: «№2 · 1/3», «Ответ · 2/4», «Голос». Длинный обрезался бы.
+    function watchTitle(name, index, total) {
+      return total > 1 ? `${name} · ${index + 1}/${total}` : name
+    }
+
+    // Части одного сообщения с паузой PART_GAP_MS. offset и total — чтобы номер части в заголовке
+    // считался от всего ответа, даже когда шлём только его половину. Возвращает функцию остановки.
+    function sendPartsPaced(name, parts, offset, total, onDone) {
+      const owner = {}
+      let i = 0
+      let timer = null
+      let stopped = false
+      const step = () => {
+        timer = null
+        if (stopped) return
+        if (i < parts.length) {
+          if (!showWatchNotification(watchTitle(name, offset + i, total), parts[i], owner)) { stopped = true; return }
+          i++
+        }
+        if (i < parts.length) timer = setTimeout(step, PART_GAP_MS)
+        else if (onDone) onDone()
+      }
+      step()
+      return () => {
+        stopped = true
+        if (timer) { clearTimeout(timer); timer = null }
+        purgeWatchOutbox(owner)
+      }
+    }
+
+    // Ответ голосом: заголовок «Голос», длинный ответ — частями с той же паузой.
+    function sendVoiceToWatch(answer) {
+      const parts = watchChunks(answer)
+      sendPartsPaced('Голос', parts, 0, parts.length)
     }
 
     // Предметы, где ответ идёт одним сплошным текстом, без деления на задания.
     const SINGLE_BLOCK_SUBJECTS = ['society', 'history', 'other']
 
-    // Длинный ответ (предметы без деления на задания) шлём половинами: первая уходит
-    // сразу, вторая через пять минут. Иначе на часы за раз валится полтора десятка
-    // уведомлений и прочитать их на уроке невозможно.
+    // Длинный ответ (предметы без деления на задания) шлём половинами. Первая уходит сразу,
+    // частями с паузой 30 с, вторая — через пять минут после последней части первой. Иначе
+    // на часы за раз валится полтора десятка уведомлений и прочитать их на уроке невозможно.
     const HALF_GAP_MS = 5 * 60 * 1000
     let lastWatchChunks = []
     let secondHalfTimer = null
+    let halvesStop = null
+
+    function stopHalves() {
+      if (halvesStop) { halvesStop(); halvesStop = null }
+      if (secondHalfTimer) {
+        clearTimeout(secondHalfTimer)
+        secondHalfTimer = null
+      }
+    }
 
     function halfRange(which) {
       const mid = Math.ceil(lastWatchChunks.length / 2)
@@ -562,38 +891,40 @@
         : { from: mid, list: lastWatchChunks.slice(mid) }
     }
 
+    // Кнопки «1–9 из 18» и «10–18 из 18»: отправить выбранную половину заново.
     function sendHalf(which) {
       if (!lastWatchChunks.length) return
       const { from, list } = halfRange(which)
       if (!list.length) return
-      sendChunks('Tutor', list, from, lastWatchChunks.length)
+      stopHalves()
+      halvesStop = sendPartsPaced('Ответ', list, from, lastWatchChunks.length)
     }
 
-    function browserNotifyHalves(title, body) {
-      if (secondHalfTimer) { clearTimeout(secondHalfTimer); secondHalfTimer = null }
+    function browserNotifyHalves(body) {
+      stopHalves()
       lastWatchChunks = watchChunks(body)
       const total = lastWatchChunks.length
       const bar = document.getElementById('halfBtns')
-      // Делить нечего, если кусок всего один — шлём как есть и прячем кнопки половин.
+      // Делить нечего, если часть всего одна, — шлём как есть и прячем кнопки половин.
       if (total <= 1) {
         if (bar) bar.style.display = 'none'
-        sendChunks(title, lastWatchChunks, 0, total)
+        halvesStop = sendPartsPaced('Ответ', lastWatchChunks, 0, total)
         return
       }
       const first = halfRange(1)
       const second = halfRange(2)
-      sendChunks(title, first.list, 0, total)
       if (bar) {
         bar.style.display = 'flex'
         document.getElementById('half1Btn').textContent = `1–${first.list.length} из ${total}`
         document.getElementById('half2Btn').textContent = `${second.from + 1}–${total} из ${total}`
       }
-      if (second.list.length) {
+      halvesStop = sendPartsPaced('Ответ', first.list, 0, total, () => {
+        if (!second.list.length) return
         secondHalfTimer = setTimeout(() => {
           secondHalfTimer = null
-          sendChunks(title, second.list, second.from, total)
+          halvesStop = sendPartsPaced('Ответ', second.list, second.from, total)
         }, HALF_GAP_MS)
-      }
+      })
     }
 
     // Единственная точка отправки готового ответа на часы. Половинами делим ТОЛЬКО
@@ -603,18 +934,21 @@
     // оборванный ответ. Решение одной задачи цельное, оно уходит целиком.
     function notifyAnswer(body) {
       if (SINGLE_BLOCK_SUBJECTS.includes(currentSubject)) {
-        browserNotifyHalves('Tutor', body)
+        browserNotifyHalves(body)
         return
       }
-      if (secondHalfTimer) { clearTimeout(secondHalfTimer); secondHalfTimer = null }
-      lastWatchChunks = watchChunks(body)
+      stopHalves()
       const bar = document.getElementById('halfBtns')
       if (bar) bar.style.display = 'none'
-      sendChunks('Tutor', lastWatchChunks, 0, lastWatchChunks.length)
+      // Одно задание идёт через ту же очередь, что и несколько: части с паузой, а не все
+      // разом, и кнопка «Отправить» ведёт себя так же, как двойное касание.
+      autoSendAllTasks(lastTasks.length ? lastTasks : [body])
     }
 
     // Единая точка обращения к Polza — раньше этим занимался server.ts.
-    async function callPolza(body, timeoutMs) {
+    // onText — просить ответ потоком: onText получает весь текст, накопленный к этому моменту,
+    // и разбор фото показывает задания по мере готовности, не дожидаясь конца ответа.
+    async function callPolza(body, timeoutMs, onText) {
       if (!apiKeys.polza) return { ok: false, error: 'Не задан ключ Polza — открой настройки' }
       const ctrl = new AbortController()
       const timer = setTimeout(() => ctrl.abort(), timeoutMs)
@@ -623,8 +957,15 @@
           method: 'POST',
           signal: ctrl.signal,
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKeys.polza },
-          body: JSON.stringify(body)
+          body: JSON.stringify(onText ? { ...body, stream: true } : body)
         })
+        const type = (res.headers && res.headers.get && res.headers.get('content-type')) || ''
+        if (onText && res.ok && res.body && type.includes('event-stream')) {
+          // Потолок времени — на весь ответ, поэтому таймер снимаем только в конце потока.
+          const streamed = await readPolzaStream(res.body, onText)
+          clearTimeout(timer)
+          return streamed
+        }
         clearTimeout(timer)
         const raw = await res.text()
         let data
@@ -635,25 +976,82 @@
         return { ok: true, answer, usage: data.usage ?? null, cost: data.cost ?? data.price ?? null }
       } catch (e) {
         clearTimeout(timer)
-        return { ok: false, error: e.name === 'AbortError' ? 'Превышено время ожидания' : e.message }
+        if (e.name === 'AbortError') return { ok: false, error: 'Превышено время ожидания' }
+        // «Failed to fetch» в Chrome и «Load failed» в Safari — это не ответ сервера, а обрыв
+        // по дороге: сеть моргнула или телефон усыпил страницу, пока модель думала.
+        return { ok: false, network: true, error: 'Нет связи с Polza (' + e.message + ')' }
       }
     }
 
-    // Разбор фото. Повторяем запрос один раз, а для pro-модели после второй неудачи
-    // падаем на flash — ровно как делал сервер.
+    // Поток Polza (SSE): строки «data: {...}», в каждой — очередной кусок текста. Поток без
+    // finish_reason в конце — оборванный ответ: это обрыв связи, и разбор фото повторит запрос.
+    async function readPolzaStream(stream, onText) {
+      const reader = stream.getReader()
+      const decoder = new TextDecoder()
+      let buffer = '', text = '', usage = null, cost = null, finish = null
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let nl
+        while ((nl = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, nl).trim()
+          buffer = buffer.slice(nl + 1)
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (!payload || payload === '[DONE]') continue
+          let chunk
+          try { chunk = JSON.parse(payload) } catch { continue }
+          if (chunk.error) return { ok: false, error: 'Polza: ' + (chunk.error.message || JSON.stringify(chunk.error)) }
+          const choice = chunk.choices?.[0]
+          const piece = choice?.delta?.content
+          if (piece) {
+            text += piece
+            try { onText(text) } catch {}
+          }
+          if (choice?.finish_reason) finish = choice.finish_reason
+          if (chunk.usage) usage = chunk.usage
+          if (chunk.cost != null) cost = chunk.cost
+        }
+      }
+      if (!finish) return { ok: false, network: true, error: 'Нет связи с Polza (ответ оборвался)' }
+      if (!text.trim()) return { ok: false, error: 'Пустой ответ. Finish: ' + finish }
+      return { ok: true, answer: text, usage, cost }
+    }
+
+    // Разбор фото. Ошибку сервера повторяем один раз, обрыв связи — дважды, а если и сильная
+    // модель (Opus) так и не ответила — пробуем Gemini.
     // Polza резервирует деньги под весь max_tokens заранее, ещё до генерации: при
     // нехватке баланса вернётся 402 «Недостаточно средств». Если такое увидишь —
-    // это про счёт, а не про код.
+    // это про счёт, а не про код. Резерв считается по цене выхода, поэтому потолок у Opus ниже:
+    // при 16382 токенах он держал бы 48 ₽ на каждый снимок, а ответ на листок — около 1,5 тыс.
     const PHOTO_MAX_TOKENS = 16382
+    const PHOTO_MAX_TOKENS_STRONG = 8000
 
-    async function analyzePhotos(images) {
+    // Рассуждения задаются одинаково для всех моделей Polza. temperature и привязку к Google AI Studio
+    // больше не шлём: Gemini 3.8 Flash идёт через Vertex и temperature не принимает.
+    function modelParams(model, effort) {
+      return { reasoning: { effort }, include_reasoning: false }
+    }
+
+    // Уровень рассуждений при разборе фото. Gemini 3.8 Flash — «minimal», без рассуждений: на «low»
+    // она иногда всё же задумывалась (тот же листок — 22 и 47 с вместо 10), на «medium» — 67 с и 4 ₽.
+    // На «minimal» четыре прогона листка подряд — 8–10 с, все шесть пунктов верно.
+    // Opus 5 — «medium»: он и должен думать, 15–17 с и около 6 ₽ за листок.
+    function photoParams(model) {
+      return model === MODEL_STRONG
+        ? { max_tokens: PHOTO_MAX_TOKENS_STRONG, ...modelParams(model, 'medium') }
+        : { max_tokens: PHOTO_MAX_TOKENS, ...modelParams(model, 'minimal') }
+    }
+
+    // onText — показ ответа по кускам. Только пока ни одна попытка не выдала текст: если поток
+    // оборвался на середине, повтор идёт обычным запросом, а задания сверяются с полным ответом.
+    async function analyzePhotos(images, onText) {
+      let streamed = false
+      const relay = onText && ((text) => { streamed = true; onText(text) })
       const build = (model) => ({
         model,
-        max_tokens: PHOTO_MAX_TOKENS,
-        temperature: 0.1,
-        ...(model.startsWith('google/')
-          ? { provider: { only: ['Google AI Studio'], allow_fallbacks: false }, reasoning: { effort: 'high' }, include_reasoning: false }
-          : {}),
+        ...photoParams(model),
         messages: [{
           role: 'user',
           content: [
@@ -663,23 +1061,44 @@
         }]
       })
       let usedModel = currentModel
-      let result = await callPolza(build(usedModel), 200000)
-      if (!result.ok) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        result = await callPolza(build(usedModel), 200000)
+      let result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay)
+      for (let attempt = 1; !result.ok && attempt <= (result.network ? 2 : 1); attempt++) {
+        await new Promise(resolve => setTimeout(resolve, result.network ? attempt * 3000 - 1000 : 1000))
+        if (result.network) await pageReadyForNetwork()
+        result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay)
       }
-      if (!result.ok && usedModel.includes('pro')) {
-        usedModel = 'google/gemini-3.5-flash'
-        result = await callPolza(build(usedModel), 200000)
+      if (!result.ok && usedModel === MODEL_STRONG) {
+        usedModel = MODEL_FAST
+        if (result.network) await pageReadyForNetwork()
+        result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay)
       }
       return { ...result, model: usedModel }
     }
 
+    // Повтор после обрыва ждёт, пока приложение снова на экране и сеть есть: из свёрнутого
+    // приложения запрос всё равно не уйдёт и оборвётся так же. Дольше двух минут не ждём.
+    function pageReadyForNetwork(maxMs = 120000) {
+      const ready = () => navigator.onLine !== false && document.visibilityState !== 'hidden'
+      if (ready()) return Promise.resolve()
+      return new Promise(resolve => {
+        const check = () => { if (ready()) finish() }
+        const finish = () => {
+          clearTimeout(timer)
+          window.removeEventListener('online', check)
+          document.removeEventListener('visibilitychange', check)
+          resolve()
+        }
+        const timer = setTimeout(finish, maxMs)
+        window.addEventListener('online', check)
+        document.addEventListener('visibilitychange', check)
+      })
+    }
+
     const PROMPTS = {
-      probability: 'Реши задания по теории вероятностей из ЕГЭ, профильная математика (задания 4 и 5). Пиши обычным текстом, без markdown и LaTeX: умножение обозначай точкой ·, степень — буквой в (0,8в4), сочетания C(5,3), факториал 5!. События обозначай ТОЛЬКО буквами A, B, C, D, F: P(A), P(B), P(C). Больше НИКАКИХ буквенных обозначений не вводи — ни n, ни m, ни p, ни q, ни k, ни H1: любую величину называй словами с числом («всего исходов - 8», «благоприятных - 3», «красных шаров - 5», «вероятность попадания - 0,8»). Курс 10-11 класса, профиль: классическое определение вероятности, комбинаторика, теоремы сложения и умножения, независимые и несовместные события, противоположное событие, условная вероятность, формула полной вероятности, схема Бернулли. Ничего сверх этого. Оформляй как образцовое решение из сборника, 3-5 строк на задачу. Первая строка — «P(A) - краткое описание события словами по условию». Вторая — данные словами с числами через запятую. Третья — вычисление: подставляй числа сразу, без буквенных формул, а каждое сочетание ОБЯЗАТЕЛЬНО расписывай через факториалы, C(5,4) = 5!/(4!·1!) = 5, в схеме Бернулли особенно, за пропуск снижают баллы. Последняя строка — «Ответ: число». Это описание структуры, а не нумерация: не печатай в ответе «1)», «2)» и подобные пометки. В каждой задаче обозначения начинаются заново, первое событие всегда A. Обыкновенную дробь ОБЯЗАТЕЛЬНО сокращай до конца, пока она не станет несократимой: 10/455 = 2/91, а не 10/455. Ответ — целое число или десятичная дробь с запятой; если деление даёт бесконечную дробь, оставь несократимую обыкновенную. Округляй только если этого требует условие. Условие не переписывай. Без оборотов «применим теорему» и «отсюда следует». Первая строка: TASKS:[кол-во]. Пустая строка между задачами. Без вступлений и без рассуждений о формате.',
-      algebra: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее — без слова Задание. ВНУТРИ задачи пустых строк не делай, все строки решения идут подряд. Пустая строка ставится ТОЛЬКО между задачами. Квадрат и куб пиши знаками ² и ³, для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Производная начинается со штриха: y\' =. Последняя строка задачи — Ответ. Первая строка: TASKS:[кол-во]. Без вступлений.',
-      geometry: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее. ВНУТРИ задачи пустых строк не делай — Дано, Решение и Ответ идут подряд, каждое с новой строки. Пустая строка ставится ТОЛЬКО между задачами. Квадрат и куб пиши знаками ² и ³ (см², м³), для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Ответ доводи до числа с единицами измерения, десятичная дробь через запятую. Первая строка: TASKS:[кол-во]. Без вступлений.',
-      physics: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее. ВНУТРИ задачи пустых строк не делай — Дано, Найти, Решение и Ответ идут подряд, каждое с новой строки. Пустая строка ставится ТОЛЬКО между задачами. Все величины переводи в СИ. Квадрат и куб пиши знаками ² и ³ (м/с², м³), для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Ответ доводи до числа с единицами измерения, десятичная дробь через запятую. Первая строка: TASKS:[кол-во]. Без вступлений.',
+      probability: 'Реши задания по теории вероятностей из ЕГЭ, профильная математика (задания 4 и 5). Пиши обычным текстом, без markdown и LaTeX: умножение обозначай точкой ·, степень — буквой в (0,8в4), сочетания C(5,3), факториал 5!. События обозначай ТОЛЬКО буквами A, B, C, D, F: P(A), P(B), P(C). Больше НИКАКИХ буквенных обозначений не вводи — ни n, ни m, ни p, ни q, ни k, ни H1: любую величину называй словами с числом («всего исходов - 8», «благоприятных - 3», «красных шаров - 5», «вероятность попадания - 0,8»). Курс 10-11 класса, профиль: классическое определение вероятности, комбинаторика, теоремы сложения и умножения, независимые и несовместные события, противоположное событие, условная вероятность, формула полной вероятности, схема Бернулли. Ничего сверх этого. Оформляй как образцовое решение из сборника, 3-5 строк на задачу. Первая строка — «P(A) - краткое описание события словами по условию». Вторая — данные словами с числами через запятую. Третья — вычисление: подставляй числа сразу, без буквенных формул, а каждое сочетание ОБЯЗАТЕЛЬНО расписывай через факториалы, C(5,4) = 5!/(4!·1!) = 5, в схеме Бернулли особенно, за пропуск снижают баллы. Последняя строка — «Ответ: число». Это описание структуры, а не нумерация: не печатай в ответе «1)», «2)» и подобные пометки. В каждой задаче обозначения начинаются заново, первое событие всегда A. Если в задаче есть пункты а), б) — каждый пункт решай как ОТДЕЛЬНУЮ задачу со своим «Ответ:», между пунктами пустая строка; в TASKS каждый пункт считается отдельной задачей. Обыкновенную дробь ОБЯЗАТЕЛЬНО сокращай до конца, пока она не станет несократимой: 10/455 = 2/91, а не 10/455. Ответ — целое число или десятичная дробь с запятой; если деление даёт бесконечную дробь, оставь несократимую обыкновенную. Округляй только если этого требует условие. Условие не переписывай. Без оборотов «применим теорему» и «отсюда следует». Первая строка: TASKS:[кол-во]. Пустая строка между задачами. Без вступлений и без рассуждений о формате.',
+      algebra: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее — без слова Задание. Если в задании есть пункты а), б), в) — каждый пункт решай как ОТДЕЛЬНУЮ задачу: своя строка номера с буквой (3а., 3б.), своё решение, свой Ответ, между пунктами пустая строка; в TASKS каждый пункт считается отдельной задачей. ВНУТРИ задачи пустых строк не делай, все строки решения идут подряд. Пустая строка ставится ТОЛЬКО между задачами. Квадрат и куб пиши знаками ² и ³, для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Производная начинается со штриха: y\' =. Последняя строка задачи — Ответ. Первая строка: TASKS:[кол-во]. Без вступлений. Бесконечность пиши знаком ∞, «не равно» — знаком ≠. В обозначениях не используй подчёркивание: не x_max, а «точка максимума x = …». Пиши коротко, как решение в тетради: только формулы, подстановка чисел и результат, каждое действие — отдельной строкой. Никаких поясняющих фраз («Найдём…», «Так как…», «Следовательно…», «Значит…», «Подставим…») и никакого пересказа условия словами. Первая строка решения — сама функция или уравнение из условия (y = …). Область определения пиши, только если она не вся числовая прямая. Обыкновенные дроби не переводи в смешанные числа: пиши 7/2, а не 3 1/2 и не «3 целых 1/2».',
+      geometry: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее. Если в задании есть пункты а), б), в) — каждый пункт решай как ОТДЕЛЬНУЮ задачу: своя строка номера с буквой (3а., 3б.), своё решение, свой Ответ, между пунктами пустая строка; в TASKS каждый пункт считается отдельной задачей. ВНУТРИ задачи пустых строк не делай — Дано, Решение и Ответ идут подряд, каждое с новой строки. Пустая строка ставится ТОЛЬКО между задачами. Квадрат и куб пиши знаками ² и ³ (см², м³), для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Ответ доводи до числа с единицами измерения, десятичная дробь через запятую. Первая строка: TASKS:[кол-во]. Без вступлений. Пиши коротко, как решение в тетради: только формулы, подстановка чисел и результат, каждое действие — отдельной строкой. Никаких поясняющих фраз («Найдём…», «Так как…», «Следовательно…», «Значит…», «Подставим…») и никакого пересказа условия словами. Решение — формулы и вычисления без слов. Обыкновенные дроби не переводи в смешанные числа: пиши 7/2, а не 3 1/2 и не «3 целых 1/2». Векторы всегда помечай стрелкой сразу после имени, в решении и в ответе: MN→, k→, 3k→ + t→. Координаты вектора пиши в круглых скобках сразу после стрелки: MN→(3; -1; 5), 3k→ + t→ = (1; 0; 7). Фигурные скобки не используй, даже если они есть в условии. Точки — без стрелки: M(1; 0; 2). Длина вектора — |MN→|, скалярное произведение — k→ · t→, угол между векторами — cos(k→, t→). Длины отрезков и числа стрелку не получают.',
+      physics: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее. Если в задании есть пункты а), б), в) — каждый пункт решай как ОТДЕЛЬНУЮ задачу: своя строка номера с буквой (3а., 3б.), своё решение, свой Ответ, между пунктами пустая строка; в TASKS каждый пункт считается отдельной задачей. ВНУТРИ задачи пустых строк не делай — Дано, Найти, Решение и Ответ идут подряд, каждое с новой строки. Пустая строка ставится ТОЛЬКО между задачами. Все величины переводи в СИ. Квадрат и куб пиши знаками ² и ³ (м/с², м³), для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Ответ доводи до числа с единицами измерения, десятичная дробь через запятую. Первая строка: TASKS:[кол-во]. Без вступлений. Если в условии сказано, в каких единицах дать ответ (например «найти в см», «в км/ч»), в строке Ответ дай именно в этих единицах. Бесконечность пиши знаком ∞, «не равно» — знаком ≠. Пиши коротко, как решение в тетради: только формулы, подстановка чисел и результат, каждое действие — отдельной строкой. Никаких поясняющих фраз («Найдём…», «Так как…», «Следовательно…», «Значит…», «Подставим…») и никакого пересказа условия словами. Дано и Найти — только обозначения с числами, Решение — формулы и вычисления без слов. Обыкновенные дроби не переводи в смешанные числа: пиши 7/2, а не 3 1/2 и не «3 целых 1/2».',
       history: 'Реши задания на фото. ТОЛЬКО краткий ответ: цифры, даты или фамилии. Формат: "1. ответ" на каждой строке. Сопоставление: только цифры слитно (пример: "5. 3142"). Никаких букв A,Б,В — только цифры. Никаких пояснений.',
       russian: 'Реши задания ЕГЭ по русскому языку с фото. Никакого markdown, никаких пояснений и рассуждений — только ответ, как его записывают в бланк ЕГЭ. Цифры пишутся слитно по возрастанию, без пробелов и запятых: 135. Ответ-слово пиши строчными буквами; если слов несколько, разделяй их пробелом. Если задание требует заменить или исключить слово, пиши то слово, которое идёт в бланк, а не исходное. Решай все задания, которые видно на фото. Ничего не додумывай и не восстанавливай по смыслу. Если часть задания физически не видна — обрезана, смазана, закрыта, — напиши для него «не разобрано» и переходи к следующему. «Не разобрано» пиши ТОЛЬКО из-за нечитаемого снимка, а не из-за сложности задания: всё, что видно, решай. Пиши обычными буквами, цифрами и знаками с клавиатуры: без надстрочных и подстрочных знаков, без стрелок и математических символов — текст должен одинаково читаться и на телефоне, и на часах. Черновик своих рассуждений не выводи никогда. Формат: "1. ответ" на каждой строке. Первая строка: TASKS:[кол-во]. Без вступлений.',
       society: 'Обществознание. ТОЛЬКО краткий ответ: цифры или слова. Формат: "1. ответ" на каждой строке. Сопоставление: только цифры слитно ("5. 3142"). Никаких букв A,Б,В. Макс 3-5 слов. Никаких пояснений.',
@@ -724,8 +1143,8 @@
         for (const [name, coord] of Object.entries(fig.points || {})) {
           jxPts[name] = geoBoard.create('point', coord, {
             name, size: 3, fixed: true,
-            label: { fontSize: 14, fontWeight: 'bold', color: '#111' },
-            color: '#7B61FF', strokeColor: '#7B61FF', fillColor: '#7B61FF'
+            label: { fontSize: 14, fontWeight: 'bold', color: '#0B0B0B' },
+            color: '#0B0B0B', strokeColor: '#0B0B0B', fillColor: '#5EF3A0'
           })
         }
 
@@ -734,7 +1153,7 @@
           const [a, b] = seg
           if (jxPts[a] && jxPts[b]) {
             geoBoard.create('segment', [jxPts[a], jxPts[b]], {
-              strokeColor: '#222', strokeWidth: 2
+              strokeColor: '#0B0B0B', strokeWidth: 2
             })
           }
         }
@@ -744,7 +1163,7 @@
           const [a, b] = seg
           if (jxPts[a] && jxPts[b]) {
             geoBoard.create('segment', [jxPts[a], jxPts[b]], {
-              strokeColor: '#888', strokeWidth: 1.5, dash: 2
+              strokeColor: '#A3A3A3', strokeWidth: 1.5, dash: 2
             })
           }
         }
@@ -754,7 +1173,7 @@
           const cp = jxPts[c.center]
           if (cp) {
             geoBoard.create('circle', [cp, c.radius], {
-              strokeColor: '#7B61FF', strokeWidth: 2, fillColor: 'none'
+              strokeColor: '#0B0B0B', strokeWidth: 2, fillColor: 'none'
             })
           }
         }
@@ -775,7 +1194,13 @@
     }
 
     let currentSubject = 'other'
-    let currentModel = 'google/gemini-3.5-flash'
+    // Модели Polza. Основная — Gemini 3.8 Flash, сильная — Claude Opus 5 (раньше GPT-5.6 Terra и Sol).
+    // GPT-5.6 плохо читает мелкое на фото: на листке «Точки экстремума» Terra прочитала 5 + ⅔x
+    // как «5 + x³». На том же снимке все 6 пунктов верно прочитали и решили Gemini 3.8 Flash
+    // (10 с, 0,5 ₽) и Opus 5 (17 с, 5,7 ₽); так же верно читали Claude Sonnet 5 и Gemini 3.1 Pro.
+    const MODEL_FAST = 'google/gemini-3.8-flash'
+    const MODEL_STRONG = 'anthropic/claude-opus-5'
+    let currentModel = MODEL_FAST
 
     function openSettingsForTab() {
       document.getElementById('settingsModal').classList.add('open')
@@ -787,18 +1212,17 @@
     }
 
     function toggleModel() {
-      const isPro = currentModel === 'google/gemini-3.1-pro-preview'
-      currentModel = isPro ? 'google/gemini-3.5-flash' : 'google/gemini-3.1-pro-preview'
+      const isPro = currentModel === MODEL_STRONG
+      currentModel = isPro ? MODEL_FAST : MODEL_STRONG
       document.getElementById('modelSelect').value = currentModel
       updateModelBtn()
     }
 
     function updateModelBtn() {
       const btn = document.getElementById('modelBtn')
-      const isPro = currentModel === 'google/gemini-3.1-pro-preview'
-      btn.textContent = isPro ? 'Pro' : 'Flash'
-      btn.style.background = isPro ? '#F0EDFF' : '#FFF3E0'
-      btn.style.color = isPro ? '#7B61FF' : '#F57C00'
+      const isPro = currentModel === MODEL_STRONG
+      btn.textContent = isPro ? 'Opus' : 'Gemini'
+      btn.dataset.state = isPro ? 'pro' : 'flash'
     }
 
 
@@ -819,7 +1243,7 @@
 
     function autoModelForSubject() {
       if (currentSubject === 'history') {
-        currentModel = 'google/gemini-3.5-flash'
+        currentModel = MODEL_FAST
         document.getElementById('modelSelect').value = currentModel
         updateModelBtn()
       }
@@ -827,60 +1251,47 @@
 
     function updateVoiceBtn() {
       const isHistory = currentSubject === 'history'
-      // Ушли с истории на другой предмет — глушим микрофон. Иначе запись продолжается,
-      // ответы падают в список, а кнопки «Остановить» на экране уже нет.
-      if (!isHistory && (continuousActive || voiceStarting)) stopContinuousVoice()
+      // Ушли с истории на другой предмет — отменяем запись: панели на экране уже не будет,
+      // а микрофон остался бы включённым.
+      if (!isHistory && voiceRec) cancelVoice()
       document.getElementById('voiceGroup').style.display = isHistory ? 'flex' : 'none'
     }
 
-    // Голосовой режим для истории: настоящий real-time через Gemini Live API (WebSocket).
-    // Микрофон льётся непрерывным потоком сырого PCM (AudioWorklet сам ресемплит до 16кГц)
-    // на наш сервер, а он пересылает поток в Google: напрямую из браузера Google отказывает
-    // по региону. Конец фразы определяет Google своим VAD, распознанный текст возвращается
-    // сюда, и уже отсюда уходит в Polza за ответом — без промежуточных хопов.
+    // ===== Голосовой ввод =====
+    // Нажал «Голосовой ввод» — говоришь: звук пишется только в память телефона, полоски
+    // реагируют на голос вживую, наружу ничего не уходит. ↑ — панель закрывается, запись
+    // уходит на расшифровку и сразу за ответом; ответ появится карточкой и придёт на часы.
+    // ■ — отменить: запись выбрасывается, ничего не отправляется.
     const MIC_STORAGE_KEY = 'tutorPreferredMic'
-    // Google иногда финализирует одну фразу несколькими кусками подряд. Склеиваем их,
-    // если пришли почти вплотную. Пауза прибавляется к каждому ответу, поэтому короткая.
-    const TRANSCRIPT_GAP_MS = 250
-    // Урок — непрерывная речь, а ответ идёт секунды. Очередь держим короткой и
-    // выбрасываем протухшее: ответ на фразу пятиминутной давности уроку не нужен.
-    const MAX_PENDING_PHRASES = 2
-    const PHRASE_STALE_MS = 15 * 1000
+    // Расшифровка — Polza (/audio/transcriptions). Замер на вопросе по-русски (4,8 с звука):
+    //   gpt-4o-transcribe 1,4–2,7 с, дословно и на чистой, и на шумной записи, ~0,06 ₽
+    //   whisper-1 2,6 с · gpt-4o-mini-transcribe 2,8 с · chirp-3 (Google) 4,8 с — дословно на чистой
+    //   aiesa/transcribe и transcribe-fast асинхронные: текст только через ~17 с, теряют «и»
+    //   и считаются за целую минуту — 0,12 и 0,40 ₽ за любой короткий вопрос
+    // Взята gpt-4o-transcribe: быстрее остальных и не ошиблась даже на шумной записи.
+    const VOICE_TRANSCRIBE_MODEL = 'openai/gpt-4o-transcribe'
+    const VOICE_SAMPLE_RATE = 16000
+    // Короче — это случайное касание, а не вопрос: не отправляем.
+    const VOICE_MIN_RECORD_MS = 500
+    // Polza принимает запрос до ~15 МБ; три минуты записи — около 7,7 МБ.
+    const VOICE_MAX_RECORD_MS = 3 * 60 * 1000
     const HISTORY_MAX = 3
-    const RELAY_RECONNECT_BASE_MS = 500
-    const RELAY_RECONNECT_MAX_MS = 8000
-    const RELAY_MAX_FAILS = 6
+    // Полоски голоса: высота — громкость, тишина — точка. Свежие полоски мятные, уходя
+    // влево, темнеют до графита и тают к краю. Ряд едет плавно, а не скачками.
+    const WAVE_PITCH = 8
+    const WAVE_BAR = 5
+    const WAVE_DOT = 3
+    const WAVE_MAX_H = 34
+    const WAVE_STEP_MS = 70
+    const WAVE_HEAD = 10
 
-    const VOICE_ANSWER_PROMPT_PREFIX = `Контекст: идёт УРОК ИСТОРИИ. Ты слушаешь непрерывную речь учителя, распознанную в реальном времени, — это в основном ОБЪЯСНЕНИЕ материала, а не вопросы. Отвечай ТОЛЬКО на то, что задано классу как вопрос или просьба.
+    const VOICE_QUESTION_PROMPT = `Ты помогаешь ученику на уроке истории. Ниже текст, записанный голосом и распознанный автоматически. Это вопрос — учителя классу или самого ученика, иногда вместе с пояснениями вокруг. В распознавании бывают ошибки в словах и именах — понимай по смыслу.
 
-Решай по ФОРМЕ фразы, а не по теме. То, что фраза историческая, само по себе НЕ повод отвечать: на уроке истории исторично всё.
+Ответь на вопрос МАКСИМАЛЬНО коротко, только суть: дата, имя, название, факт. Без вступлений, без пересказа вопроса, без markdown. Если вопросов несколько — ответ на каждый с новой строки. Если явного вопроса нет — назови главный факт из текста, о котором могут спросить.
 
-ОТВЕЧАЙ, если фраза — одно из:
-1. Вопрос: есть вопросительное слово (кто, что, когда, где, почему, зачем, какой, сколько, чей) или вопросительный порядок слов ("был ли", "правда ли, что").
-2. Задание классу: "назовите", "перечислите", "объясните", "расскажите про", "вспомните", "дайте определение", "кто скажет", "кто помнит", "кто ответит".
-3. Короткая (до 6 слов) именная фраза без сказуемого, похожая на запрос: "столица древней руси", "год смерти ивана грозного".
-4. Уточнение к твоему предыдущему ответу: "а почему", "а дальше", "а точнее".
-
-SKIP, если фраза — что угодно из:
-- Повествование или диктовка: законченное утверждение, сообщающее факт ("в 1861 году отменили крепостное право", "Пётр I основал Петербург"). Это объяснение учителя. Даже если тема историческая — SKIP.
-- Оргвопросы урока: "откройте учебник", "запишите тему", "проверим домашнее задание".
-- Бытовой разговор, реплики учеников, обрывки без смысла, другой предмет.
-- Риторический вопрос внутри объяснения, на который учитель тут же отвечает сам ("и что мы видим? мы видим кризис").
-
-Если сомневаешься между "вопрос" и "утверждение" — выбирай SKIP. Один пропущенный вопрос лучше, чем поток ответов на объяснение.
-
-Формат ответа: МАКСИМАЛЬНО коротко, только суть (дата/имя/название/факт), без вступлений и пояснений. Пример: "в каком году было Крещение Руси" → "988 год".
-
-Когда не отвечаешь — ровно одно слово: SKIP, без пояснений и знаков препинания.
+Пример: «в каком году было Крещение Руси» → «988 год».
 
 `
-    // Порог тишины экономит трафик (16кГц PCM в base64 — это ~2.6 МБ в минуту, ~115 МБ
-    // за урок) и не даёт слать в Google пустой класс. Если вдруг перестанет слышать
-    // тихого учителя — выключается здесь, одной строкой.
-    const VOICE_SILENCE_GATE = true
-    // Хвост после последней речи шлём обязательно: по нему Google понимает,
-    // что фраза закончилась, и отдаёт финальную расшифровку.
-    const VOICE_GATE_HANGOVER_SEC = 2.0
 
     // Учитель в нескольких метрах от телефона. Браузерная обработка по умолчанию
     // откалибрована под речь у самого микрофона: шумодав принимает дальнее поле за шум
@@ -894,6 +1305,9 @@ SKIP, если фраза — что угодно из:
       }
       return deviceId ? { ...base, deviceId: { exact: deviceId } } : base
     }
+
+    // Перевод микрофона в 16 кГц PCM пакетами по 512 сэмплов. Пакеты копятся в памяти
+    // и по ↑ собираются в один WAV.
     const PCM_WORKLET_CODE = `
       class PCMProcessor extends AudioWorkletProcessor {
         constructor() {
@@ -902,23 +1316,7 @@ SKIP, если фраза — что угодно из:
           this.readPos = 0
           this.buffer = []
           this.outBuf = []
-          // 512 сэмплов @16кГц = 32мс аудио в пакете. При 2048 каждая фраза начинала
-          // ехать в Google на 128мс позже, и на столько же позже приходил ответ.
           this.chunkSize = 512
-          this.gate = ${VOICE_SILENCE_GATE}
-          this.hangover = ${VOICE_GATE_HANGOVER_SEC}
-          this.noiseFloor = 0.01
-          this.lastVoiceTime = -1e9
-          // Предзапись: держим последние отброшенные пакеты тишины и отдаём их первыми,
-          // когда началась речь. Иначе тихий заход в фразу («а вот скажите...») падал
-          // ниже порога и первое слово просто не доезжало до распознавания.
-          this.preroll = []
-          this.prerollMax = 4
-        }
-        emit(pcm) {
-          const int16 = new Int16Array(pcm.length)
-          for (let i = 0; i < pcm.length; i++) int16[i] = Math.round(pcm[i] * 32767)
-          this.port.postMessage(int16.buffer, [int16.buffer])
         }
         process(inputs) {
           const channel = inputs[0] && inputs[0][0]
@@ -933,28 +1331,11 @@ SKIP, если фраза — что угодно из:
           }
           const consumed = Math.floor(this.readPos)
           if (consumed > 0) { this.buffer = this.buffer.slice(consumed); this.readPos -= consumed }
-          if (this.outBuf.length >= this.chunkSize) {
-            const pcm = this.outBuf.splice(0, this.outBuf.length)
-            if (this.gate) {
-              let sum = 0
-              for (let i = 0; i < pcm.length; i++) sum += pcm[i] * pcm[i]
-              const rms = Math.sqrt(sum / pcm.length)
-              // Фон отслеживаем асимметрично: вниз быстро, вверх очень медленно, иначе
-              // сама речь подтянет порог за собой и учитель окажется "тишиной".
-              // Коэффициенты привязаны к длине пакета (32мс): постоянные времени те же
-              // ~1.3с вниз и ~26с вверх, что и при прежних 128мс.
-              this.noiseFloor = rms < this.noiseFloor
-                ? this.noiseFloor * 0.975 + rms * 0.025
-                : this.noiseFloor * 0.99875 + rms * 0.00125
-              if (rms > Math.max(0.002, this.noiseFloor * 2)) this.lastVoiceTime = currentTime
-              if (currentTime - this.lastVoiceTime > this.hangover) {
-                this.preroll.push(pcm)
-                if (this.preroll.length > this.prerollMax) this.preroll.shift()
-                return true
-              }
-              while (this.preroll.length) this.emit(this.preroll.shift())
-            }
-            this.emit(pcm)
+          while (this.outBuf.length >= this.chunkSize) {
+            const pcm = this.outBuf.splice(0, this.chunkSize)
+            const int16 = new Int16Array(pcm.length)
+            for (let i = 0; i < pcm.length; i++) int16[i] = Math.round(pcm[i] * 32767)
+            this.port.postMessage(int16.buffer, [int16.buffer])
           }
           return true
         }
@@ -962,56 +1343,37 @@ SKIP, если фраза — что угодно из:
       registerProcessor('pcm-processor', PCMProcessor)
     `
 
-    let continuousActive = false
-    // Вкладка свёрнута: режим не выключен, но микрофон и сокет временно погашены.
-    // Отдельный флаг нужен, чтобы реконнект не поднимал соединение в фоне.
-    let voicePaused = false
-    let voiceStarting = false
-    // Номер попытки запуска: каждый stop/старт/восстановление увеличивает его, и любая
-    // асинхронная цепочка, начатая раньше, по несовпадению номера тихо сворачивается.
-    let voiceSession = 0
-    let voiceStream = null
-    let voiceWakeLock = null
-    let audioContext = null
-    let workletNode = null
+    // Текущая запись. Каждое нажатие создаёт новый объект, и любая асинхронная цепочка
+    // сверяется с ним: отменённая запись тихо сворачивает свои хвосты.
+    let voiceRec = null
     let lastVoiceAnswer = ''
-
-    // Сокет к нашему ретранслятору распознавания и его переподключение.
-    let relaySocket = null
-    let relayReconnectTimer = null
-    let relayFails = 0
-    // Причина последнего обрыва со стороны Google — показываем её пользователю.
-    let lastCloseInfo = ''
-    // Склейка кусков расшифровки и очередь фраз на ответ.
-    let lastTranscript = ''
-    let pendingTranscript = ''
-    let transcriptTimer = null
-    let pendingPhrases = []
-    let answering = false
-    // Короткая память диалога на урок: переживает пересоздание сессии Google, нужна для
-    // уточняющих вопросов вроде "а почему?".
+    // Короткая память диалога: нужна для уточнений вроде «а почему?».
     let conversationHistory = []
 
-    function setVoiceUiListening(on) {
-      document.getElementById('voiceBtnText').textContent = on ? 'Слушаю...' : 'Голосовой ввод'
-      document.getElementById('voiceBtn').style.background = on ? '#C62828' : '#E8F5E9'
-      document.getElementById('voiceBtn').style.color = on ? '#fff' : '#2E7D32'
-      document.getElementById('voiceCancelBtn').style.display = on ? 'block' : 'none'
-      const recognizedEl = document.getElementById('voiceRecognizedText')
-      recognizedEl.style.display = on ? 'block' : 'none'
-      if (!on) recognizedEl.textContent = ''
+    function renderVoice() {
+      const rec = voiceRec
+      document.getElementById('voiceBtn').style.display = rec ? 'none' : 'flex'
+      document.getElementById('voicePanel').style.display = rec ? 'flex' : 'none'
+      if (rec) document.getElementById('voiceRightBtn').disabled = rec.state !== 'recording'
     }
 
-    function showVoiceStatus(status) {
-      document.getElementById('voiceRecognizedText').textContent = status
+    // Под кнопкой пишем только о сбое — в обычной работе никаких надписей.
+    function showVoiceError(message) {
+      const log = document.getElementById('voiceRecognizedText')
+      log.textContent = message
+      log.style.display = message ? 'block' : 'none'
     }
 
-    async function acquireVoiceWakeLock() {
-      try { voiceWakeLock = await navigator.wakeLock.request('screen') } catch {}
+    function voiceDurationMs(rec) {
+      return Math.round(rec.samples / VOICE_SAMPLE_RATE * 1000)
     }
 
-    function releaseVoiceWakeLock() {
-      if (voiceWakeLock) { try { voiceWakeLock.release() } catch {}; voiceWakeLock = null }
+    async function acquireVoiceWakeLock(rec) {
+      try {
+        const lock = await navigator.wakeLock.request('screen')
+        if (voiceRec === rec && rec.state === 'recording') rec.wakeLock = lock
+        else lock.release()
+      } catch {}
     }
 
     async function pickMicDeviceId() {
@@ -1031,32 +1393,20 @@ SKIP, если фраза — что угодно из:
       return mics[0]?.deviceId || null
     }
 
+    // Разрешение на микрофон уже дано — названия микрофонов видны, берём сохранённый.
+    // Иначе сначала короткий запрос: без него браузер не отдаёт список для настроек.
+    async function resolveMicDevice() {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      if (!devices.some(d => d.kind === 'audioinput' && d.label)) {
+        const probe = await navigator.mediaDevices.getUserMedia({ audio: true })
+        probe.getTracks().forEach(t => t.stop())
+      }
+      return pickMicDeviceId()
+    }
+
+    // Новый микрофон берётся со следующей записи: текущую не рвём.
     function onMicChange(deviceId) {
       try { localStorage.setItem(MIC_STORAGE_KEY, deviceId) } catch {}
-      if (continuousActive) { stopContinuousVoice(); startContinuousVoice() }
-    }
-
-    async function toggleVoice() {
-      if (continuousActive) { stopContinuousVoice(); return }
-      await startContinuousVoice()
-    }
-
-    function cancelVoice() {
-      stopContinuousVoice()
-    }
-
-    function giveUpContinuousVoice(reason) {
-      stopContinuousVoice()
-      document.getElementById('voiceBtnText').textContent = 'Нажмите, чтобы продолжить'
-      document.getElementById('voiceBtn').style.background = '#FFF3E0'
-      document.getElementById('voiceBtn').style.color = '#F57C00'
-      // Причину показываем ПОСЛЕ остановки: setVoiceUiListening(false) прячет и чистит
-      // строку статуса, поэтому написанное до вызова тут же пропадало.
-      if (reason) {
-        const el = document.getElementById('voiceRecognizedText')
-        el.style.display = 'block'
-        el.textContent = reason
-      }
     }
 
     function arrayBufferToBase64(buffer) {
@@ -1069,12 +1419,324 @@ SKIP, если фраза — что угодно из:
       return btoa(binary)
     }
 
-    function finalizeVoiceAnswer(answer, heard, ms) {
-      // Сравниваем с последним ГОЛОСОВЫМ ответом, а не с общим lastAnswer: тот пишется ещё
-      // и разбором фото, и совпадение с ним молча съедало корректный ответ по речи.
-      if (answer === lastVoiceAnswer) { showVoiceStatus('Такой же ответ, как только что — пропускаю'); return }
-      // Время самого запроса к модели — чтобы было видно, где именно уходит задержка.
-      showVoiceStatus((ms ? 'Отвечено за ' + (ms / 1000).toFixed(1) + ' с: ' : 'Отвечено: ') + answer)
+    // Пакеты PCM → один WAV: 44 байта заголовка и сами сэмплы, 16 бит, моно.
+    function buildWav(chunks, sampleRate) {
+      const samples = chunks.reduce((n, c) => n + c.length, 0)
+      const buffer = new ArrayBuffer(44 + samples * 2)
+      const view = new DataView(buffer)
+      const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)) }
+      writeStr(0, 'RIFF')
+      view.setUint32(4, 36 + samples * 2, true)
+      writeStr(8, 'WAVE')
+      writeStr(12, 'fmt ')
+      view.setUint32(16, 16, true)
+      view.setUint16(20, 1, true)
+      view.setUint16(22, 1, true)
+      view.setUint32(24, sampleRate, true)
+      view.setUint32(28, sampleRate * 2, true)
+      view.setUint16(32, 2, true)
+      view.setUint16(34, 16, true)
+      writeStr(36, 'data')
+      view.setUint32(40, samples * 2, true)
+      const pcm = new Int16Array(buffer, 44, samples)
+      let pos = 0
+      for (const chunk of chunks) { pcm.set(chunk, pos); pos += chunk.length }
+      return buffer
+    }
+
+    async function transcribeVoice(base64) {
+      if (!apiKeys.polza) return { ok: false, error: 'Не задан ключ Polza — открой настройки' }
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), 60000)
+      try {
+        const res = await fetch('https://polza.ai/api/v1/audio/transcriptions', {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKeys.polza },
+          body: JSON.stringify({ model: VOICE_TRANSCRIBE_MODEL, file: base64, language: 'ru' })
+        })
+        const raw = await res.text()
+        let data = null
+        try { data = JSON.parse(raw) } catch {}
+        if (!res.ok) return { ok: false, error: 'HTTP ' + res.status + (data?.error?.message ? ': ' + data.error.message : '') }
+        if (!data) return { ok: false, error: 'Не JSON: ' + raw.substring(0, 200) }
+        return { ok: true, text: String(data.text || '').trim() }
+      } catch (e) {
+        return { ok: false, error: e.name === 'AbortError' ? 'Превышено время ожидания' : e.message }
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+
+    async function startVoice() {
+      if (voiceRec) return
+      if (!apiKeys.polza) {
+        alert('Сначала укажи ключ Polza в настройках — без него не будет ни расшифровки, ни ответов')
+        document.getElementById('settingsModal').classList.add('open')
+        return
+      }
+      const rec = {
+        state: 'starting', chunks: [], samples: 0,
+        ctx: null, stream: null, worklet: null, analyser: null, raf: 0, levels: [], smooth: 0,
+        wakeLock: null, timers: []
+      }
+      voiceRec = rec
+      showVoiceError('')
+      renderVoice()
+      // Контекст создаём прямо в нажатии, до первого await: иначе Safari на iPhone
+      // запускает его приостановленным и в запись не приходит ни одного сэмпла.
+      try {
+        rec.ctx = new (window.AudioContext || window.webkitAudioContext)()
+        if (rec.ctx.state === 'suspended') {
+          const resuming = rec.ctx.resume()
+          if (resuming && resuming.catch) resuming.catch(() => {})
+        }
+      } catch { rec.ctx = null }
+      const alive = () => voiceRec === rec && rec.state === 'starting'
+      try {
+        const deviceId = await resolveMicDevice()
+        if (!alive()) return
+        rec.stream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints(deviceId) })
+        if (!alive()) { stopVoiceAudio(rec); return }
+        await setupVoiceAudio(rec)
+        if (!alive()) { stopVoiceAudio(rec); return }
+      } catch (e) {
+        if (!alive()) { stopVoiceAudio(rec); return }
+        cancelVoice()
+        showVoiceError('Нет доступа к микрофону')
+        return
+      }
+      rec.state = 'recording'
+      renderVoice()
+      acquireVoiceWakeLock(rec)
+      startVoiceWave(rec)
+      rec.timers.push(setTimeout(() => { if (voiceRec === rec) sendVoice() }, VOICE_MAX_RECORD_MS))
+    }
+
+    async function setupVoiceAudio(rec) {
+      if (!rec.ctx) rec.ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const ctx = rec.ctx
+      if (ctx.state === 'suspended') { try { await ctx.resume() } catch {} }
+      const workletUrl = URL.createObjectURL(new Blob([PCM_WORKLET_CODE], { type: 'application/javascript' }))
+      try { await ctx.audioWorklet.addModule(workletUrl) } finally { URL.revokeObjectURL(workletUrl) }
+      if (voiceRec !== rec || rec.state !== 'starting' || rec.ctx !== ctx) return
+      const source = ctx.createMediaStreamSource(rec.stream)
+      // Полоса речи до прореживания 48→16 кГц: без фильтра всё выше 8 кГц заворачивалось бы
+      // в речевой диапазон шипением, а ниже 80 Гц гудят стулья и столы.
+      const highpass = ctx.createBiquadFilter()
+      highpass.type = 'highpass'
+      highpass.frequency.value = 80
+      const lowpass = ctx.createBiquadFilter()
+      lowpass.type = 'lowpass'
+      lowpass.frequency.value = 7000
+      rec.worklet = new AudioWorkletNode(ctx, 'pcm-processor')
+      rec.worklet.port.onmessage = (e) => {
+        if (voiceRec !== rec || rec.state !== 'recording') return
+        const chunk = new Int16Array(e.data)
+        rec.chunks.push(chunk)
+        rec.samples += chunk.length
+      }
+      // Полоски берут сырой сигнал отдельной веткой.
+      rec.analyser = ctx.createAnalyser()
+      rec.analyser.fftSize = 1024
+      // Тихий гейн держит граф живым (Safari иначе не обрабатывает ни воркл, ни анализатор),
+      // но не выводит микрофон в динамик.
+      const silent = ctx.createGain()
+      silent.gain.value = 0
+      source.connect(highpass)
+      highpass.connect(lowpass)
+      lowpass.connect(rec.worklet)
+      rec.worklet.connect(silent)
+      source.connect(rec.analyser)
+      rec.analyser.connect(silent)
+      silent.connect(ctx.destination)
+    }
+
+    function hexToRgb(hex) {
+      const m = /^#?([0-9a-f]{6})$/i.exec(hex || '')
+      if (!m) return null
+      const v = parseInt(m[1], 16)
+      return [(v >> 16) & 255, (v >> 8) & 255, v & 255]
+    }
+
+    function startVoiceWave(rec) {
+      if (!rec.analyser) return
+      const canvas = document.getElementById('voiceWave')
+      const dpr = window.devicePixelRatio || 1
+      const w = canvas.clientWidth || 300
+      const h = canvas.clientHeight || 40
+      canvas.width = Math.round(w * dpr)
+      canvas.height = Math.round(h * dpr)
+      const g = canvas.getContext('2d')
+      g.setTransform(dpr, 0, 0, dpr, 0, 0)
+      // Цвета — из палитры сайта: графит кнопок, мятный акцент, точка между текстом и фоном.
+      const css = getComputedStyle(document.documentElement)
+      const cssRgb = (name, fallback) => hexToRgb(css.getPropertyValue(name).trim()) || fallback
+      const muted = cssRgb('--muted', [163, 163, 163])
+      const fill = cssRgb('--fill', [244, 244, 244])
+      const wave = {
+        g, w, h,
+        ink: cssRgb('--btn-dark', [31, 31, 31]),
+        mint: cssRgb('--mint-press', [72, 228, 140]),
+        dot: muted.map((v, i) => Math.round((v + fill[i]) / 2))
+      }
+      // На одну полоску больше, чем помещается: крайняя справа въезжает, а не выскакивает.
+      rec.levels = new Array(Math.ceil(w / WAVE_PITCH) + 1).fill(0)
+      const samples = new Uint8Array(rec.analyser.fftSize)
+      let noiseFloor = 0.02
+      let lastStep = 0
+      const frame = (t) => {
+        if (voiceRec !== rec || rec.state !== 'recording') return
+        rec.analyser.getByteTimeDomainData(samples)
+        let sum = 0
+        for (let i = 0; i < samples.length; i++) { const v = (samples[i] - 128) / 128; sum += v * v }
+        const rms = Math.sqrt(sum / samples.length)
+        // Фон класса отслеживаем, чтобы гул не поднимал полоски: вниз быстро, вверх медленно.
+        noiseFloor = rms < noiseFloor ? noiseFloor * 0.9 + rms * 0.1 : noiseFloor * 0.998 + rms * 0.002
+        const target = Math.min(1, Math.pow(Math.max(0, rms - noiseFloor * 1.8) * 8, 0.7))
+        // Полоска вырастает быстро, а опадает мягко — без дёрганья.
+        rec.smooth += (target - rec.smooth) * (target > rec.smooth ? 0.55 : 0.2)
+        if (!lastStep) lastStep = t
+        if (t - lastStep >= WAVE_STEP_MS) {
+          rec.levels.shift()
+          rec.levels.push(rec.smooth)
+          // После паузы вкладки не догоняем пропущенные шаги разом.
+          lastStep = t - lastStep >= WAVE_STEP_MS * 2 ? t : lastStep + WAVE_STEP_MS
+        }
+        rec.levels[rec.levels.length - 1] = rec.smooth
+        drawVoiceWave(wave, rec.levels, Math.min(1, (t - lastStep) / WAVE_STEP_MS) * WAVE_PITCH)
+        rec.raf = requestAnimationFrame(frame)
+      }
+      drawVoiceWave(wave, rec.levels, 0)
+      rec.raf = requestAnimationFrame(frame)
+    }
+
+    // Ряд полосок: новые справа, старые уходят влево. Скругление — как у кнопок сайта.
+    function drawVoiceWave(wave, levels, shift) {
+      const { g, w, h, ink, mint, dot } = wave
+      g.clearRect(0, 0, w, h)
+      const cy = h / 2
+      const n = levels.length
+      for (let i = 0; i < n; i++) {
+        const age = n - 1 - i
+        const cx = w + WAVE_PITCH / 2 - age * WAVE_PITCH - shift
+        if (cx < -WAVE_PITCH || cx > w + WAVE_PITCH) continue
+        const k = Math.min(1, levels[i])
+        let bw = WAVE_DOT
+        let bh = WAVE_DOT
+        let rgb = dot
+        if (k >= 0.04) {
+          bw = WAVE_BAR
+          bh = WAVE_DOT + (WAVE_MAX_H - WAVE_DOT) * k
+          const fresh = Math.max(0, 1 - age / WAVE_HEAD)
+          rgb = ink.map((v, j) => Math.round(v + (mint[j] - v) * fresh))
+        }
+        g.globalAlpha = Math.max(0, Math.min(1, cx / (WAVE_PITCH * 6)))
+        g.fillStyle = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`
+        const x = cx - bw / 2
+        const y = cy - bh / 2
+        const r = Math.min(1.5, bw / 2)
+        g.beginPath()
+        g.moveTo(x + r, y)
+        g.lineTo(x + bw - r, y)
+        g.quadraticCurveTo(x + bw, y, x + bw, y + r)
+        g.lineTo(x + bw, y + bh - r)
+        g.quadraticCurveTo(x + bw, y + bh, x + bw - r, y + bh)
+        g.lineTo(x + r, y + bh)
+        g.quadraticCurveTo(x, y + bh, x, y + bh - r)
+        g.lineTo(x, y + r)
+        g.quadraticCurveTo(x, y, x + r, y)
+        g.closePath()
+        g.fill()
+      }
+      g.globalAlpha = 1
+    }
+
+    function stopVoiceAudio(rec) {
+      if (rec.raf) { cancelAnimationFrame(rec.raf); rec.raf = 0 }
+      if (rec.worklet) { try { rec.worklet.port.onmessage = null; rec.worklet.disconnect() } catch {}; rec.worklet = null }
+      if (rec.ctx) {
+        try { const closing = rec.ctx.close(); if (closing && closing.catch) closing.catch(() => {}) } catch {}
+        rec.ctx = null
+      }
+      if (rec.stream) { rec.stream.getTracks().forEach(t => t.stop()); rec.stream = null }
+      if (rec.wakeLock) { try { rec.wakeLock.release() } catch {}; rec.wakeLock = null }
+    }
+
+    function clearVoiceTimers(rec) {
+      rec.timers.forEach(clearTimeout)
+      rec.timers = []
+    }
+
+    // ■ и уход с истории: запись выбрасывается, ничего не отправляется.
+    function cancelVoice() {
+      const rec = voiceRec
+      if (!rec) return
+      voiceRec = null
+      stopVoiceAudio(rec)
+      clearVoiceTimers(rec)
+      rec.chunks = []
+      renderVoice()
+    }
+
+    // ↑, предел длительности и сворачивание приложения: панель закрывается сразу,
+    // расшифровка и ответ идут в фоне.
+    function sendVoice() {
+      const rec = voiceRec
+      if (!rec || rec.state !== 'recording') return
+      voiceRec = null
+      stopVoiceAudio(rec)
+      clearVoiceTimers(rec)
+      renderVoice()
+      if (voiceDurationMs(rec) < VOICE_MIN_RECORD_MS) return
+      processVoice(rec.chunks, currentSubject)
+    }
+
+    async function processVoice(chunks, subject) {
+      // Сначала даём экрану закрыть панель, потом собираем WAV: на длинной записи это
+      // заметная доля секунды.
+      await new Promise(resolve => setTimeout(resolve, 0))
+      const transcript = await transcribeVoice(arrayBufferToBase64(buildWav(chunks, VOICE_SAMPLE_RATE)))
+      if (!transcript.ok) { showVoiceError('Не удалось расшифровать: ' + transcript.error); return }
+      const question = transcript.text
+      if (!question) { showVoiceError('Ничего не распознано — попробуй ещё раз'); return }
+      const historyBlock = conversationHistory.length
+        ? 'Предыдущие вопросы и ответы (используй, если текущий вопрос — уточнение вроде «а почему?»):\n' +
+          conversationHistory.map((h, i) => `${i + 1}. Вопрос: ${h.q}\n   Ответ: ${h.a}`).join('\n') + '\n\n'
+        : ''
+      let result
+      try {
+        result = await callPolza({
+          // Основная модель без рассуждений (minimal). Проверено на Gemini 3.8 Flash: «988 год,
+          // Владимир Святославич (Владимир Великий)» за 3,4 с, 0 токенов на рассуждения, 0,02 ₽.
+          model: MODEL_FAST,
+          max_tokens: 400,
+          ...modelParams(MODEL_FAST, 'minimal'),
+          messages: [{ role: 'user', content: [{ type: 'text', text: VOICE_QUESTION_PROMPT + historyBlock + 'Вопрос: ' + question }] }]
+        }, 20000)
+      } catch (e) {
+        result = { ok: false, error: e && e.message }
+      }
+      const answer = result && result.ok && result.answer ? String(result.answer).trim() : ''
+      if (!answer) { showVoiceError('Не удалось получить ответ: ' + ((result && result.error) || 'пустой ответ')); return }
+      conversationHistory.push({ q: question, a: answer })
+      if (conversationHistory.length > HISTORY_MAX) conversationHistory.shift()
+      finalizeVoiceAnswer(answer, question, subject)
+    }
+
+    function voiceLeftAction() {
+      cancelVoice()
+    }
+
+    function voiceRightAction() {
+      sendVoice()
+    }
+
+    function finalizeVoiceAnswer(answer, heard, subject) {
+      sendVoiceToWatch(answer)
+      // Пока ждали ответ, могли переключить предмет: карточку в чужой список не кладём,
+      // на часы ответ всё равно ушёл.
+      if (subject !== currentSubject) return
       lastVoiceAnswer = answer
       lastAnswer = answer
       hide('errorCard')
@@ -1083,337 +1745,58 @@ SKIP, если фраза — что угодно из:
       const list = document.getElementById('tasksList')
       const card = document.createElement('div')
       card.className = 'task-card'
-      // Показываем и распознанную фразу: в потоке карточек иначе не понять,
-      // на какой вопрос это ответ.
-      const heardLine = heard
-        ? `<div style="font-size:12px;color:#999;margin-bottom:6px;word-break:break-word;line-height:1.35">${heard.replace(/</g, '&lt;')}</div>`
-        : ''
-      card.innerHTML = heardLine + `<div class="task-text">${answer.replace(/</g, '&lt;')}</div>`
+      // Над ответом — распознанный вопрос: в потоке карточек иначе не понять, к чему ответ.
+      card.innerHTML = `<div class="heard">${heard.replace(/</g, '&lt;')}</div><div class="task-text">${answer.replace(/</g, '&lt;')}</div>`
       list.insertBefore(card, list.firstChild)
       list.style.display = 'flex'
-      browserNotify('Tutor', answer)
     }
 
-    // ===== Ответ на распознанную фразу =====
-
-    async function handleFinalTranscript(text) {
-      if (!continuousActive || text === lastTranscript) return
-      lastTranscript = text
-      const historyBlock = conversationHistory.length
-        ? 'Контекст предыдущих вопросов и ответов на этом уроке (используй, если текущая фраза — уточнение вроде "а почему?", "а что дальше?"):\n' +
-          conversationHistory.map((h, i) => `${i + 1}. Вопрос: ${h.q}\n   Ответ: ${h.a}`).join('\n') + '\n\n'
-        : ''
-      const startedAt = Date.now()
-      const result = await callPolza({
-        // Замеры на живом ключе, один и тот же промпт, медиана из трёх прогонов:
-        //   gemini-3.7-flash      7010 мс (разброс 2450–9599), 42 токена мыслей
-        //   gemini-3.6-flash      1298 мс, 0 мыслей
-        //   gemini-3.1-flash-lite 1442 мс, 0 мыслей, 12/12 верных решений
-        //   gemini-3.5-flash-lite 1105 мс, 0 мыслей, 12/12 верных решений
-        // «Reasoning is mandatory» — ограничение конкретно 3.7-flash: остальные модели
-        // принимают minimal и не тратят на мысли ни одного токена.
-        // Везде одна модель — 3.5-flash: на голосе она чуть медленнее lite, но
-        // разбирает вопрос учителя точнее, а разнобой моделей давал разное качество
-        // ответа на один и тот же вопрос в голосе и на фото.
-        model: 'google/gemini-3.5-flash',
-        max_tokens: 300,
-        temperature: 0.1,
-        provider: { only: ['Google AI Studio'], allow_fallbacks: false },
-        reasoning: { effort: 'minimal' },
-        include_reasoning: false,
-        messages: [{ role: 'user', content: [{ type: 'text', text: VOICE_ANSWER_PROMPT_PREFIX + historyBlock + 'Текущая фраза: ' + text }] }]
-      }, 20000)
-      const tookMs = Date.now() - startedAt
-      if (!result.ok || !result.answer) { showVoiceStatus('Ошибка: ' + (result.error || 'пустой ответ')); return }
-      const answer = result.answer.trim()
-      // Строгое сравнение с 'SKIP' пропускало «SKIP.» и «SKIP — бытовая фраза» прямо
-      // на экран как ответ. Смотрим на начало строки, игнорируя обрамление.
-      if (!answer || /^[\s"'«»*_>-]*SKIP\b/i.test(answer)) {
-        showVoiceStatus('Не вопрос: "' + text + '" — слушаю дальше')
-        return
-      }
-      conversationHistory.push({ q: text, a: answer })
-      if (conversationHistory.length > HISTORY_MAX) conversationHistory.shift()
-      finalizeVoiceAnswer(answer, text, tookMs)
-    }
-
-    function enqueuePhrase(text) {
-      pendingPhrases.push({ text, at: Date.now() })
-      // Если модель отстаёт от речи, копить бессмысленно — оставляем самые свежие фразы.
-      while (pendingPhrases.length > MAX_PENDING_PHRASES) pendingPhrases.shift()
-      drainPhrases()
-    }
-
-    async function drainPhrases() {
-      if (answering) return
-      answering = true
-      try {
-        while (continuousActive) {
-          const item = pendingPhrases.shift()
-          if (!item) break
-          if (Date.now() - item.at > PHRASE_STALE_MS) continue
-          try { await handleFinalTranscript(item.text) } catch { /* одна фраза не должна ронять очередь */ }
-        }
-      } finally {
-        answering = false
-      }
-    }
-
-    function queueFinalTranscript(text) {
-      pendingTranscript = pendingTranscript ? pendingTranscript + ' ' + text : text
-      if (transcriptTimer !== null) clearTimeout(transcriptTimer)
-      transcriptTimer = setTimeout(() => {
-        const combined = pendingTranscript.trim()
-        pendingTranscript = ''
-        transcriptTimer = null
-        if (combined) enqueuePhrase(combined)
-      }, TRANSCRIPT_GAP_MS)
-    }
-
-    // ===== Живая сессия распознавания =====
-    // Звук идёт не прямо в Google, а через наш сервер: Google отклоняет обращения к Gemini
-    // API из региона пользователя («User location is not supported for the API use»), и из
-    // браузера напрямую сессия не поднимается вообще. Сервер пересылает звук своим IP
-    // и возвращает распознанный текст. Ответ на вопрос при этом по-прежнему берётся из
-    // браузера напрямую у Polza — она из России доступна, и лишний хоп там стоил бы секунду.
-    const VOICE_RELAY = 'https://hungry-camel-14.zigzaktm.deno.net'
-
-    function closeRelaySocket() {
-      if (!relaySocket) return
-      const ws = relaySocket
-      relaySocket = null
-      try { ws.onclose = null; ws.onmessage = null; ws.onerror = null; ws.onopen = null; ws.close() } catch {}
-    }
-
-    function scheduleRelayReconnect() {
-      if (relayReconnectTimer !== null) return
-      relayFails++
-      if (relayFails > RELAY_MAX_FAILS) {
-        giveUpContinuousVoice('Распознавание недоступно' + lastCloseInfo + ' — проверь интернет')
-        return
-      }
-      showVoiceStatus('Связь потеряна' + lastCloseInfo + ', восстанавливаю...')
-      const delay = Math.min(RELAY_RECONNECT_BASE_MS * 2 ** (relayFails - 1), RELAY_RECONNECT_MAX_MS)
-      relayReconnectTimer = setTimeout(() => {
-        relayReconnectTimer = null
-        if (continuousActive && !voicePaused) connectRelay(true)
-      }, delay)
-    }
-
-    function connectRelay(afterFailure) {
-      const ws = new WebSocket(VOICE_RELAY.replace(/^http/, 'ws') + '/live-voice')
-      ws.onopen = () => {
-        if (ws !== relaySocket) return
-        relayFails = 0
-        if (afterFailure) showVoiceStatus('Связь восстановлена, слушаю')
-      }
-      ws.onmessage = (e) => {
-        let msg
-        try { msg = JSON.parse(e.data) } catch { return }
-        if (msg.type === 'final' && msg.text) queueFinalTranscript(msg.text)
-        else if (msg.type === 'interim' && msg.text) showVoiceStatus('Слышу: ' + msg.text)
-        else if (msg.type === 'status' && msg.text) showVoiceStatus(msg.text)
-        else if (msg.type === 'error') showVoiceStatus('Ошибка: ' + msg.error)
-      }
-      ws.onerror = () => {}
-      ws.onclose = (e) => {
-        lastCloseInfo = e && e.code && e.code !== 1000 ? ' (' + e.code + ')' : ''
-        // Закрытие уже заменённого сокета игнорируем — иначе поверх живого соединения
-        // поднимется второе, а ссылка на него потеряется.
-        if (ws !== relaySocket) return
-        relaySocket = null
-        if (!continuousActive || voicePaused) return
-        scheduleRelayReconnect()
-      }
-      relaySocket = ws
-    }
-
-    function startLiveSession() {
-      relayFails = 0
-      lastTranscript = ''
-      pendingTranscript = ''
-      pendingPhrases = []
-      connectRelay(false)
-    }
-
-    function teardownLiveSession() {
-      if (relayReconnectTimer !== null) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null }
-      if (transcriptTimer !== null) { clearTimeout(transcriptTimer); transcriptTimer = null }
-      closeRelaySocket()
-      pendingTranscript = ''
-      pendingPhrases = []
-    }
-
-    // Полная разборка аудио-тракта: воркл, контекст, треки микрофона, вейклок.
-    function teardownAudio() {
-      if (workletNode) { try { workletNode.port.onmessage = null; workletNode.disconnect() } catch {}; workletNode = null }
-      if (audioContext) { try { audioContext.close() } catch {}; audioContext = null }
-      if (voiceStream) { voiceStream.getTracks().forEach(t => t.stop()); voiceStream = null }
-      releaseVoiceWakeLock()
-    }
-
-    // Сворачивание своей же попытки запуска. Если глобальные voiceStream/audioContext
-    // уже перехватила следующая попытка — трогаем только собственный поток, иначе
-    // погасили бы живой микрофон вместо своего.
-    function abortVoiceSetup(stream) {
-      if (!stream || voiceStream === stream) { teardownAudio(); return }
-      stream.getTracks().forEach(t => t.stop())
-    }
-
-    async function setupAudioPipeline(stream) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)()
-      // Контекст создаётся уже после await getUserMedia, то есть вне синхронного стека
-      // пользовательского жеста — Safari/iOS стартует его в suspended, и в воркл не
-      // приходит ни одного сэмпла: режим «слушает» молча и навсегда.
-      if (audioContext.state === 'suspended') { try { await audioContext.resume() } catch {} }
-      const workletUrl = URL.createObjectURL(new Blob([PCM_WORKLET_CODE], { type: 'application/javascript' }))
-      // Модуль уже загружен — blob-URL больше не нужен, иначе он копится на каждый рестарт.
-      try { await audioContext.audioWorklet.addModule(workletUrl) } finally { URL.revokeObjectURL(workletUrl) }
-      const source = audioContext.createMediaStreamSource(stream)
-      // Ограничиваем полосу до речевой ДО того, как воркл проредит 48кГц в 16кГц.
-      // Прореживание там простое, без фильтра, поэтому всё выше 8кГц заворачивалось
-      // обратно в речевой диапазон широкополосным шипением (алиасинг) — распознавание
-      // разбирало речь сквозь него. Заодно срезаем гул ниже 80Гц: шаги, стулья, стол.
-      const highpass = audioContext.createBiquadFilter()
-      highpass.type = 'highpass'
-      highpass.frequency.value = 80
-      const lowpass = audioContext.createBiquadFilter()
-      lowpass.type = 'lowpass'
-      lowpass.frequency.value = 7000
-      workletNode = new AudioWorkletNode(audioContext, 'pcm-processor')
-      workletNode.port.onmessage = (e) => {
-        if (!relaySocket || relaySocket.readyState !== WebSocket.OPEN) return
-        const base64 = arrayBufferToBase64(e.data)
-        relaySocket.send(JSON.stringify({ realtimeInput: { audio: { data: base64, mimeType: 'audio/pcm;rate=16000' } } }))
-      }
-      // Тихий гейн вместо прямого коннекта к destination — держит граф "живым" для
-      // AudioWorklet, но не даёт микрофону слышаться из динамика (эхо).
-      const silentGain = audioContext.createGain()
-      silentGain.gain.value = 0
-      source.connect(highpass)
-      highpass.connect(lowpass)
-      lowpass.connect(workletNode)
-      workletNode.connect(silentGain)
-      silentGain.connect(audioContext.destination)
-    }
-
-    async function startContinuousVoice() {
-      // Флаг continuousActive поднимается только в самом конце, поэтому без отдельной
-      // защиты второй клик по кнопке успевал запустить второй микрофонный поток поверх
-      // первого — первый терялся и горел до перезагрузки страницы.
-      if (continuousActive || voiceStarting) return
-      // Ключ Google браузеру больше не нужен — распознавание идёт через сервер, ключ
-      // лежит в его переменных окружения. Здесь нужен только Polza, для ответов.
-      if (!apiKeys.polza) {
-        alert('Сначала укажи ключ Polza в настройках — без него не будет ответов')
-        document.getElementById('settingsModal').classList.add('open')
-        return
-      }
-      voiceStarting = true
-      const session = ++voiceSession
-      try {
-        let deviceId = null
-        try {
-          const probe = await navigator.mediaDevices.getUserMedia({ audio: true })
-          probe.getTracks().forEach(t => t.stop())
-          deviceId = await pickMicDeviceId()
-        } catch (e) {
-          alert('Нет доступа к микрофону')
-          setVoiceUiListening(false)
-          return
-        }
-        if (session !== voiceSession) return
-        let stream = null
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: micConstraints(deviceId) })
-          // Пока ждали разрешение, режим могли остановить — поток гасим сразу.
-          if (session !== voiceSession) { stream.getTracks().forEach(t => t.stop()); return }
-          voiceStream = stream
-          await setupAudioPipeline(stream)
-          if (session !== voiceSession) { abortVoiceSetup(stream); return }
-        } catch (e) {
-          // Поток мог открыться и упасть уже на сборке пайплайна — гасим всё,
-          // иначе микрофон остаётся включённым.
-          abortVoiceSetup(stream)
-          // Остановка во время запуска роняет сборку пайплайна на закрытом контексте —
-          // это не отказ в доступе, молчим.
-          if (session !== voiceSession) return
-          alert('Нет доступа к микрофону')
-          setVoiceUiListening(false)
-          return
-        }
-        continuousActive = true
-        voicePaused = false
-        lastVoiceAnswer = ''
-        conversationHistory = []
-        document.getElementById('tasksList').innerHTML = ''
-        setVoiceUiListening(true)
-        acquireVoiceWakeLock()
-        startLiveSession()
-      } finally {
-        voiceStarting = false
-      }
-    }
-
-    function stopContinuousVoice() {
-      // Сдвигаем номер сессии: запуск или восстановление, зависшие на await, увидят
-      // несовпадение и не поднимут микрофон уже после остановки.
-      voiceSession++
-      continuousActive = false
-      voicePaused = false
-      setVoiceUiListening(false)
-      teardownLiveSession()
-      teardownAudio()
-    }
-
+    // Свернули приложение посреди записи — iPhone всё равно отбирает микрофон в фоне.
+    // Отправляем то, что успели сказать.
     document.addEventListener('visibilitychange', () => {
-      if (!continuousActive) return
-      if (document.visibilityState === 'hidden') {
-        if (voicePaused) return
-        // Пауза, а не остановка: teardownLiveSession снимает обработчики, поэтому
-        // реконнект не поднимет сессию в фоне, где аудио всё равно некому отправлять.
-        voicePaused = true
-        voiceSession++
-        teardownLiveSession()
-        teardownAudio()
-      } else if (document.visibilityState === 'visible') {
-        if (!voicePaused) return
-        voicePaused = false
-        const session = ++voiceSession
-        let savedMic = null
-        try { savedMic = localStorage.getItem(MIC_STORAGE_KEY) } catch {}
-        navigator.mediaDevices.getUserMedia({ audio: micConstraints(savedMic) }).then(async stream => {
-          if (session !== voiceSession) { stream.getTracks().forEach(t => t.stop()); return }
-          voiceStream = stream
-          await setupAudioPipeline(stream)
-          if (session !== voiceSession) { abortVoiceSetup(stream); return }
-          acquireVoiceWakeLock()
-          startLiveSession()
-        }).catch(() => {
-          if (session !== voiceSession) return
-          giveUpContinuousVoice()
-        })
-      }
+      if (document.visibilityState === 'hidden' && voiceRec && voiceRec.state === 'recording') sendVoice()
     })
 
     function toBase64(file) {
       return new Promise((resolve, reject) => {
         const img = new Image()
+        const url = URL.createObjectURL(file)
+        const release = () => { img.onload = img.onerror = null; URL.revokeObjectURL(url) }
         img.onload = () => {
-          const MAX = 1600
-          let w = img.width, h = img.height
-          if (w > MAX || h > MAX) {
-            if (w > h) { h = Math.round(h * MAX / w); w = MAX }
-            else { w = Math.round(w * MAX / h); h = MAX }
+          try {
+            // 2400, а не 1600: мелкие дроби вроде ⅔x на снимке листка при 1600 выходят в несколько
+            // пикселей, и модель гадает. Больше — тяжелее отправка и дороже картинка у Opus.
+            const MAX = 2400
+            let w = img.width, h = img.height
+            if (w > MAX || h > MAX) {
+              if (w > h) { h = Math.round(h * MAX / w); w = MAX }
+              else { w = Math.round(w * MAX / h); h = MAX }
+            }
+            const c = document.createElement('canvas')
+            c.width = w; c.height = h
+            c.getContext('2d').drawImage(img, 0, 0, w, h)
+            const data = c.toDataURL('image/jpeg', 0.80).split(',')[1]
+            // Safari держит память холста, пока у него есть размер, — отдаём её сразу,
+            // иначе к третьему-четвёртому листу упираемся в его лимит памяти холстов.
+            c.width = 0; c.height = 0
+            release()
+            resolve(data)
+          } catch (e) {
+            release()
+            reject(new Error('Не удалось обработать снимок'))
           }
-          const c = document.createElement('canvas')
-          c.width = w; c.height = h
-          c.getContext('2d').drawImage(img, 0, 0, w, h)
-          resolve(c.toDataURL('image/jpeg', 0.80).split(',')[1])
         }
-        img.onerror = () => reject(new Error('Не удалось прочитать файл'))
-        img.src = URL.createObjectURL(file)
+        img.onerror = () => { release(); reject(new Error('Не удалось прочитать файл')) }
+        img.src = url
       })
+    }
+
+    // Листы сжимаем по одному, а не все разом: в памяти одновременно только один
+    // декодированный снимок.
+    async function filesToBase64(files) {
+      const out = []
+      for (const file of files) out.push(await toBase64(file))
+      return out
     }
 
     function show(id)  { document.getElementById(id).style.display = 'flex' }
@@ -1424,40 +1807,110 @@ SKIP, если фраза — что угодно из:
     let lastAnswer = ''
     let lastTasks = []
     let lastPhotoUrl = null
-    let timerInterval = null
     let sendQueue = null
-
-    function startTimer() {}
-    function stopTimer() {}
 
     // Метка TASKS:n — служебная, нужна только разбивке. На экран и на часы она
     // попадать не должна: при одном задании она уезжала прямо в текст ответа.
-    const stripTasksMarker = (t) => String(t).replace(/^\s*TASKS:\s*\d+\s*/i, '').trim()
+    // Модель пишет её и как TASKS:[6] — буквально по шаблону из промпта, — и с пробелом.
+    const stripTasksMarker = (t) => String(t).replace(/^\s*TASKS:\s*\[?\s*\d+\s*\]?\s*/i, '').trim()
 
     function splitTasks(text) {
-      const countMatch = text.match(/TASKS:(\d+)/)
+      const countMatch = text.match(/TASKS:\s*\[?\s*(\d+)\s*\]?/i)
       // Модель, несмотря на запрет, иногда оформляет номера markdown-разметкой:
       // «**1.**», «* 1)», «### 1.». Тогда строка перестаёт начинаться с цифры,
       // разбивка по номерам не срабатывает, и весь разбор приезжает одной карточкой.
       // Поэтому разметку снимаем до разбора. Минус в начале строки не трогаем — это
       // может быть знак отрицательного ответа.
       const clean = text
-        .replace(/TASKS:\d+/, '')
+        .replace(/TASKS:\s*\[?\s*\d+\s*\]?/i, '')
         .replace(/\r\n/g, '\n')
         .replace(/\*\*|__/g, '')
         .replace(/^[ \t]*[*#>]+[ \t]*/gm, '')
         .trim()
       const parts = clean.split(/\n[ \t]*\n+/).map(p => p.trim()).filter(Boolean)
+      // Номер в начале строки: «3.», «3)», «3 », у пунктов — «3а.», «3б)». Буква допускается
+      // только перед точкой или скобкой, иначе строка решения «3x = 21» резалась бы как задача.
+      const byNumber = () => clean.split(/^(?=\d{1,2}(?:[а-яa-z][.)]|[.) ]))/m).map(p => p.trim()).filter(Boolean)
+      let tasks
       if (countMatch) {
         const n = parseInt(countMatch[1])
-        if (parts.length === n) return parts
-        const numbered = clean.split(/^(?=\d{1,2}[.) ])/m).map(p => p.trim()).filter(Boolean)
-        if (numbered.length === n) return numbered
-        return parts.length > 1 ? parts : [clean]
+        if (parts.length === n) tasks = parts
+        else {
+          const numbered = byNumber()
+          tasks = numbered.length === n ? numbered : (parts.length > 1 ? parts : [clean])
+        }
+      } else if (parts.length > 1) {
+        tasks = parts
+      } else {
+        const numbered = byNumber()
+        tasks = numbered.length > 1 ? numbered : [clean]
       }
-      if (parts.length > 1) return parts
-      const numbered = clean.split(/^(?=\d{1,2}[.) ])/m).map(p => p.trim()).filter(Boolean)
-      return numbered.length > 1 ? numbered : [clean]
+      return tasks.flatMap(splitSubItems)
+    }
+
+    // Пункты а), б), в) одной задачи — отдельные задания: у каждого своё решение, свой ответ
+    // и своя отправка на часы. Модель просят писать их отдельно; если она всё же свела пункты
+    // в один блок, режем здесь. Общее условие до первого пункта остаётся у первого пункта.
+    function splitSubItems(task) {
+      const lines = task.split('\n')
+      const starts = []
+      lines.forEach((line, i) => {
+        const m = /^\s*([а-еa-e])\s*[).](?:\s+\S|\s*$)/i.exec(line)
+        if (!m) return
+        const letter = m[1].toLowerCase()
+        const order = 'абвгде'.includes(letter) ? 'абвгде'.indexOf(letter) : 'abcde'.indexOf(letter)
+        if (order === starts.length) starts.push({ line: i, letter })
+      })
+      if (starts.length < 2) return [task]
+      const head = lines.slice(0, starts[0].line).filter(l => l.trim())
+      const numMatch = head.length ? /^\s*(\d{1,2})\s*[.)]\s*/.exec(head[0]) : null
+      if (numMatch) {
+        const rest = head[0].slice(numMatch[0].length).trim()
+        if (rest) head[0] = rest
+        else head.shift()
+      }
+      const num = numMatch ? numMatch[1] : ''
+      return starts.map((s, k) => {
+        const end = k + 1 < starts.length ? starts[k + 1].line : lines.length
+        const body = lines.slice(s.line, end)
+        body[0] = body[0].replace(/^\s*[а-еa-e]\s*[).]\s*/i, '')
+        if (!body[0].trim()) body.shift()
+        const label = num ? num + s.letter + '.' : s.letter + ')'
+        return [label, ...(k === 0 ? head : []), ...body].join('\n').trim()
+      })
+    }
+
+    // Строка номера в начале задания: «1.», «1)», «1а.», «1 а)», «1(а)». Точка или скобка должна
+    // стоять перед пробелом или концом строки — «1.5 см» и «3x = 21» номером не считаются.
+    const TASK_NUMBER_RE = /^\s*(\d{1,2})\s*(?:([а-яa-z])\s*[.)]|\(([а-яa-z])\)\s*[.)]?|[.)])(?=[ \t]|\n|$)/i
+
+    // Подпись задания — номер из ответа модели: «1», «3а». Нет номера — по порядку.
+    function taskLabel(task, i) {
+      const m = TASK_NUMBER_RE.exec(String(task))
+      if (!m) return String(i + 1)
+      const letter = m[2] || m[3]
+      return m[1] + (letter ? letter.toLowerCase() : '')
+    }
+
+    // «3а» → «3 (а)» с серой буквой: так подписаны кнопки и карточки.
+    function taskLabelHtml(label) {
+      const m = /^(\d{1,2})([а-яa-z])$/i.exec(label)
+      return m ? `${m[1]} <span class="task-sub">(${m[2]})</span>` : label
+    }
+
+    // «3 (а)» — та же подпись простым текстом, для заголовка уведомления.
+    function taskLabelText(label) {
+      const m = /^(\d{1,2})([а-яa-z])$/i.exec(label)
+      return m ? `${m[1]} (${m[2]})` : label
+    }
+
+    // Текст задания без строки номера. Номер модель пишет, чтобы приложение разбило ответ
+    // и подписало кнопки, а на карточке и на часах он лишний: подпись там уже есть.
+    function taskBody(task) {
+      const text = String(task)
+      const m = TASK_NUMBER_RE.exec(text)
+      if (!m) return text.trim()
+      return text.slice(m[0].length).replace(/^[ \t]*\n?/, '').trim()
     }
 
     // Результаты живут отдельно для каждого предмета. Область ответа одна на всё
@@ -1503,7 +1956,10 @@ SKIP, если фраза — что угодно из:
       // не переживают восстановление html — вешаем заново.
       lastTasks.forEach((task, i) => {
         const btn = document.getElementById('task-btn-' + i)
-        if (btn) btn.onclick = () => autoSendAllTasks(lastTasks, i)
+        if (!btn) return
+        // Очередь при уходе с предмета остановлена: «отправляется» на кнопке остаться не должно.
+        if (btn.dataset.state === 'sending') delete btn.dataset.state
+        btn.onclick = () => autoSendAllTasks(lastTasks, i)
       })
     }
 
@@ -1511,10 +1967,11 @@ SKIP, если фраза — что угодно из:
       if (value === currentSubject) return
       // Очередь автоотправки принадлежала прежнему предмету: её задачи уже заменены
       // в lastTasks, и продолжение слало бы на часы чужие ответы.
-      if (sendQueue) clearTimeout(sendQueue)
-      autoSendCancel = null
+      stopTaskQueue()
       // Вторая половина ответа тоже принадлежала прежнему предмету.
-      if (secondHalfTimer) { clearTimeout(secondHalfTimer); secondHalfTimer = null }
+      stopHalves()
+      // Заготовки ожидания принадлежат запросу, а не предмету: на другом экране им не место.
+      hide('loadingCards')
       subjectViews[currentSubject] = captureSubjectView()
       currentSubject = value
       restoreSubjectView(subjectViews[value] || pristineView)
@@ -1522,27 +1979,32 @@ SKIP, если фраза — что угодно из:
       autoModelForSubject()
     }
 
-    function renderTasks(tasks) {
+    // keepStates — список дописывается по ходу ответа: отметки «отправляется/отправлено»
+    // на уже показанных кнопках сохраняем.
+    function renderTasks(tasks, keepStates) {
       const list = document.getElementById('tasksList')
       const header = document.getElementById('tasksHeader')
       const bar = document.getElementById('taskBtnsBar')
+      const states = keepStates ? Array.from(bar.children, b => b.dataset.state) : []
       list.innerHTML = ''
       bar.innerHTML = ''
       const total = tasks.length
       tasks.forEach((task, i) => {
         const card = document.createElement('div')
         card.className = 'task-card'
+        const label = taskLabel(task, i)
         card.innerHTML = `
-          <div class="task-num">№${i + 1}</div>
-          <div class="task-text">${task.replace(/</g, '&lt;')}</div>
+          <div class="task-num">№${taskLabelHtml(label)}</div>
+          <div class="task-text">${taskBody(task).replace(/</g, '&lt;')}</div>
         `
         list.appendChild(card)
         const btn = document.createElement('button')
         btn.id = `task-btn-${i}`
-        btn.textContent = String(i + 1)
-        // flex-basis 44px и перенос строк: без них двадцать заданий сжимали кнопки до 7px,
-        // и попасть пальцем было невозможно. 44px — минимальная площадь касания.
-        btn.style.cssText = 'flex:1 1 44px;min-width:44px;height:40px;border:none;border-radius:10px;background:#F0EDFF;color:#7B61FF;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s'
+        btn.innerHTML = taskLabelHtml(label)
+        // Размер и цвета — в CSS (.seat-grid, .task-btn): сетка держит ячейку не уже 44px,
+        // иначе при двадцати заданиях в кнопку было не попасть пальцем.
+        btn.className = 'task-btn'
+        if (states[i]) btn.dataset.state = states[i]
         // Не одиночная отправка, а перезапуск очереди с этого номера: нажал «4» —
         // ушло четвёртое, дальше пятое, шестое, а прежняя очередь остановлена.
         btn.onclick = () => autoSendAllTasks(lastTasks, i)
@@ -1552,109 +2014,274 @@ SKIP, если фраза — что угодно из:
       list.style.display = 'flex'
     }
 
-    async function sendTask(idx, total, token) {
-      const task = lastTasks[idx]
-      if (!task) return
-      // Очередь могли перезапустить двойным касанием, пока это задание ждало отправки.
-      // Без этой проверки уже отменённая очередь успевала дослать своё сообщение поверх
-      // новой, и на часы приходили номера вперемешку.
-      if (token && token !== autoSendCancel) return
+    // ===== Очередь заданий на часы =====
+    // Задания уходят строго по очереди, с первого по последнее: части одного задания — с паузой
+    // 30 с, между заданиями — 3 минуты, после последнего очередь останавливается сама.
+    // Короткие ответы без решения («135», «расположенный»), идущие подряд, уходят одним
+    // сообщением списком: по одному раз в три минуты четыре ответа русского шли бы девять минут.
+    // Следующий шаг заводится только после предыдущего: если iPhone приостановил страницу,
+    // после возврата части не вываливаются пачкой, а идут дальше с тем же шагом.
+    const PART_GAP_MS = 30 * 1000
+    const TASK_GAP_MS = 3 * 60 * 1000
+    const SHORT_TASK_MAX = 40
+    let autoSendCancel = null
+    let sendWakeLock = null
+
+    function setTaskBtnState(idx, state) {
       const btn = document.getElementById(`task-btn-${idx}`)
-      const num = String(idx + 1)
-      if (btn) { btn.textContent = '...'; btn.style.background = '#ddd' }
-      try {
-        browserNotify(`${idx + 1}/${total ?? lastTasks.length}`, task)
-        if (btn) { btn.textContent = '✓'; btn.style.background = '#E8F5E9'; btn.style.color = '#2E7D32'; setTimeout(() => { btn.textContent = num; btn.style.background = '#F0EDFF'; btn.style.color = '#7B61FF' }, 2000) }
-      } catch(e) {
-        if (btn) { btn.textContent = '!'; btn.style.background = '#FFE0E0'; btn.style.color = '#FF453A'; setTimeout(() => { btn.textContent = num; btn.style.background = '#F0EDFF'; btn.style.color = '#7B61FF' }, 2000) }
-      }
+      if (!btn) return
+      if (state) btn.dataset.state = state
+      else delete btn.dataset.state
     }
 
-    let autoSendCancel = null
-    // startIdx — с какого задания продолжать. Нажатие на номер задачи перезапускает
-    // очередь с этого места: прежняя очередь глушится токеном и снятым таймером,
-    // иначе она параллельно досылала на часы свои старые номера.
-    function autoSendAllTasks(tasks, startIdx) {
+    // Пока идёт очередь, экран не гаснет: на заблокированном iPhone страница засыпает,
+    // и следующие части не ушли бы до разблокировки.
+    async function holdSendWakeLock() {
+      if (sendWakeLock || !autoSendCancel || !navigator.wakeLock) return
+      try {
+        const lock = await navigator.wakeLock.request('screen')
+        if (autoSendCancel && !sendWakeLock) sendWakeLock = lock
+        else lock.release()
+      } catch {}
+    }
+
+    function releaseSendWakeLock() {
+      if (sendWakeLock) { try { sendWakeLock.release() } catch {}; sendWakeLock = null }
+    }
+
+    // Когда приложение свёрнуто, система сама отпускает блокировку экрана — берём её заново,
+    // как только вернулись, если очередь ещё идёт.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !autoSendCancel) return
+      sendWakeLock = null
+      holdSendWakeLock()
+    })
+
+    // purge — убрать из очереди показа ещё не показанные части этой очереди. При остановке
+    // (номер, «Заново», смена предмета) — да, а когда очередь дошла до конца — нет: последняя
+    // часть может ждать своих четырёх секунд за ответом голосом.
+    function stopTaskQueue(purge = true) {
       if (sendQueue) { clearTimeout(sendQueue); sendQueue = null }
+      if (purge && autoSendCancel) purgeWatchOutbox(autoSendCancel)
+      autoSendCancel = null
+      releaseSendWakeLock()
+    }
+
+    function isShortTask(task) {
+      const body = taskBody(task)
+      return body.length > 0 && body.length <= SHORT_TASK_MAX && !body.includes('\n')
+    }
+
+    // Что уходит одним сообщением: одно задание или подряд идущие короткие ответы.
+    function watchUnit(tasks, from) {
+      let to = from
+      if (isShortTask(tasks[from])) while (to + 1 < tasks.length && isShortTask(tasks[to + 1])) to++
+      const labels = []
+      for (let i = from; i <= to; i++) labels.push(taskLabelText(taskLabel(tasks[i], i)))
+      const text = from === to
+        ? taskBody(tasks[from])
+        : tasks.slice(from, to + 1).map((t, k) => `${labels[k]}. ${taskBody(t)}`).join('\n')
+      const name = from === to ? `№${labels[0]}` : `№${labels[0]}-${labels[labels.length - 1]}`
+      return { from, to, name, parts: watchChunks(text) }
+    }
+
+    // startIdx — с какого задания начать. Номер задачи, «Отправить все» и двойное касание
+    // перезапускают очередь; прежняя останавливается целиком, вместе с частями, которые
+    // ещё не ушли. Пока ответ модели дописывается (liveAnswer), список растёт на ходу: дойдя
+    // до конца известных заданий, очередь ждёт следующее, а не останавливается.
+    function autoSendAllTasks(tasks, startIdx) {
+      stopTaskQueue()
+      if (!tasks || !tasks.length) return
       const token = {}
       autoSendCancel = token
-      const total = tasks.length
-      let i = Math.min(Math.max(Number(startIdx) || 0, 0), total)
-      async function sendNext() {
-        if (token !== autoSendCancel) return
-        if (i >= total) return
-        nextTaskIdx = i
-        try { await sendTask(i, total, token) } catch(e) {}
-        i++
-        nextTaskIdx = i
-        if (token !== autoSendCancel) return
-        const delay = currentSubject === 'probability' ? 30000 : 60000
-        if (i < total) sendQueue = setTimeout(sendNext, delay)
+      const growing = () => !!(liveAnswer && liveAnswer.live && liveAnswer.tasks === tasks)
+      let taskIdx = Math.min(Math.max(Number(startIdx) || 0, 0), tasks.length - 1)
+      // С выбранного номера и дальше отметки снимаются; отправленные раньше остаются.
+      for (let i = 0; i < tasks.length; i++) {
+        const btn = document.getElementById(`task-btn-${i}`)
+        if (btn && (i >= taskIdx || btn.dataset.state === 'sending')) delete btn.dataset.state
       }
-      sendNext()
+      holdSendWakeLock()
+      let unit = null
+      let partIdx = 0
+      const mark = (state) => { for (let i = unit.from; i <= unit.to; i++) setTaskBtnState(i, state) }
+      const step = () => {
+        sendQueue = null
+        if (token !== autoSendCancel) return
+        if (!unit) {
+          if (taskIdx >= tasks.length) {
+            // Ответ ещё дописывается: следующее задание вот-вот появится.
+            if (growing()) { sendQueue = setTimeout(step, 1000); return }
+            stopTaskQueue(false)
+            return
+          }
+          unit = watchUnit(tasks, taskIdx)
+          partIdx = 0
+          nextTaskIdx = taskIdx
+          mark('sending')
+        }
+        if (partIdx < unit.parts.length) {
+          // Уведомления выключены — помечаем задание и останавливаемся, а не делаем вид,
+          // что всё ушло.
+          if (!showWatchNotification(watchTitle(unit.name, partIdx, unit.parts.length), unit.parts[partIdx], token)) {
+            mark('error')
+            stopTaskQueue()
+            return
+          }
+          partIdx++
+          if (partIdx < unit.parts.length) { sendQueue = setTimeout(step, PART_GAP_MS); return }
+        }
+        mark('done')
+        taskIdx = unit.to + 1
+        unit = null
+        nextTaskIdx = taskIdx
+        if (taskIdx < tasks.length || growing()) { sendQueue = setTimeout(step, TASK_GAP_MS); return }
+        stopTaskQueue(false)
+      }
+      step()
+    }
+
+    // ===== Задания по мере готовности =====
+    // Модель пишет ответ потоком. Задание готово, как только за ним начался номер следующего:
+    // его сразу показываем, а первое ещё и отправляем на часы. Замер на листке из шести задач:
+    // первое задание готово через 4–6 с, весь ответ — через 9–10 с; на странице задачника
+    // из 32 задач — через 9 с и 47 с. Последнее задание и одиночный ответ ждут конца ответа.
+    // Сплошные предметы и короткие ответы (русский) — тоже: они уходят целиком или списком,
+    // а приходят и так за секунды.
+    let liveAnswer = null
+    const NEXT_TASK_START = /\n[ \t]*\n[ \t]*(?:\*\*|#+[ \t]*)?\d{1,2}[ \t]*(?:[а-яa-z][ \t]*)?[.)](?=\s)/gi
+
+    // Готовые задания из недописанного ответа: всё, после чего уже начался номер следующего.
+    // Кусок между началами соседних номеров — ровно одно задание, поэтому не splitTasks: у куска
+    // без метки TASKS там включается разбивка по номерам строк, и строки решения вроде
+    // «17 · 24 = 408» становились отдельными заданиями. Чистка — та же, что в splitTasks.
+    function readyTasks(text) {
+      const body = String(text).replace(/FIGURE_JSON:[\s\S]*$/, '')
+      const tasks = []
+      let from = 0
+      for (const m of body.matchAll(NEXT_TASK_START)) {
+        const task = stripTasksMarker(body.slice(from, m.index))
+          .replace(/\r\n/g, '\n')
+          .replace(/\*\*|__/g, '')
+          .replace(/^[ \t]*[*#>]+[ \t]*/gm, '')
+          .trim()
+        if (task) tasks.push(...splitSubItems(task))
+        from = m.index
+      }
+      return tasks
+    }
+
+    function startEarlyTasks(subject) {
+      if (SINGLE_BLOCK_SUBJECTS.includes(subject)) return null
+      const early = { tasks: [], started: false, live: true }
+      early.onText = (text) => {
+        if (!early.live || currentSubject !== subject) return
+        const tasks = readyTasks(text)
+        if (tasks.length <= early.tasks.length) return
+        if (!early.started && isShortTask(tasks[0])) return
+        early.tasks.splice(0, early.tasks.length, ...tasks)
+        lastTasks = early.tasks
+        if (!early.started) {
+          hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
+          hide('errorCard')
+          hide('loadingCards')
+        }
+        renderTasks(early.tasks, early.started)
+        if (!early.started) {
+          early.started = true
+          liveAnswer = early
+          autoSendAllTasks(early.tasks)
+        }
+      }
+      return early
+    }
+
+    // Готовый ответ — на экран и на часы. Если задания уже показывались по ходу потока, очередь
+    // идёт: полный ответ только уточняет список, не перезапуская отправку.
+    function showPhotoAnswer(data, early) {
+      hide('loadingCards')
+      const displayAnswer = currentSubject === 'geometry' ? parseAndRenderGeometry(data.answer) : (renderFigure(null), data.answer)
+      lastAnswer = stripTasksMarker(displayAnswer)
+      const tasks = splitTasks(displayAnswer)
+      if (early && early.started) {
+        early.tasks.splice(0, early.tasks.length, ...tasks)
+        lastTasks = early.tasks
+        renderTasks(lastTasks, true)
+        return
+      }
+      lastTasks = tasks
+      nextTaskIdx = 0
+      if (lastTasks.length > 1 && !SINGLE_BLOCK_SUBJECTS.includes(currentSubject)) {
+        hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
+        renderTasks(lastTasks)
+        autoSendAllTasks(lastTasks)
+      } else {
+        document.getElementById('tasksList').style.display = 'none'
+        // Одно задание: строка номера на карточке тоже лишняя. В сплошных предметах текст как есть —
+        // там «1. ответ» на каждой строке и есть сам ответ.
+        setText('resultText', SINGLE_BLOCK_SUBJECTS.includes(currentSubject) ? lastAnswer : taskBody(lastAnswer))
+        document.getElementById('resultHeader').style.display = 'block'
+        document.getElementById('resultResendBtn').style.display = 'block'
+        document.getElementById('resultCost').textContent = ''
+        block('resultCard')
+        notifyAnswer(lastAnswer)
+      }
     }
 
     let lastFiles = []
 
     async function regenerate() {
       if (!lastFiles.length) return
-      autoSendCancel = null
-      if (sendQueue) clearTimeout(sendQueue)
+      stopTaskQueue()
       hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
       hide('errorCard')
       document.getElementById('tasksList').style.display = 'none'
       document.getElementById('tasksHeader').style.display = 'none'
-      show('status')
-      startTimer()
+      show('loadingCards')
+      let early = null
       try {
-        const images = await Promise.all(lastFiles.map(toBase64))
-        const data = await analyzePhotos(images)
+        const images = await filesToBase64(lastFiles)
+        early = startEarlyTasks(currentSubject)
+        const data = await analyzePhotos(images, early && early.onText)
         if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
-        const displayAnswer = currentSubject === 'geometry' ? parseAndRenderGeometry(data.answer) : (renderFigure(null), data.answer)
-        lastAnswer = stripTasksMarker(displayAnswer)
-        lastTasks = splitTasks(displayAnswer)
-        nextTaskIdx = 0
-        stopTimer()
-        hide('status')
-        const usedModel = data.model || currentModel
-        if (lastTasks.length > 1 && !SINGLE_BLOCK_SUBJECTS.includes(currentSubject)) {
-          hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
-          renderTasks(lastTasks)
-          autoSendAllTasks(lastTasks)
-        } else {
-          document.getElementById('tasksList').style.display = 'none'
-          setText('resultText', lastAnswer)
-
-          document.getElementById('resultHeader').style.display = 'block'
-          document.getElementById('resultResendBtn').style.display = 'block'
-          block('resultCard')
-          notifyAnswer(lastAnswer)
-        }
+        showPhotoAnswer(data, early)
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch(e) {
-        stopTimer()
-        hide('status')
         setText('errorText', e.message || 'Ошибка')
         block('errorCard')
       }
+      hide('loadingCards')
+      if (early) early.live = false
     }
 
     let lastTap = 0
     let nextTaskIdx = 0
+    let touchStart = null
+    // Двойное касание засчитывается только по пустому месту и только как два коротких тапа
+    // без сдвига. Раньше его ловило что угодно: двойной тап по номеру «4» перезапускал отправку
+    // с первого задания, как и свайп с последующим касанием или тапы в настройках.
+    const DOUBLE_TAP_IGNORE = 'button, a, input, select, textarea, label, canvas, .modal-overlay, .voice-panel, .shot-overlay'
+    document.addEventListener('touchstart', (e) => {
+      const t = e.touches && e.touches[0]
+      touchStart = e.touches && e.touches.length === 1 && t ? { x: t.clientX, y: t.clientY, at: Date.now() } : null
+    }, { passive: true })
     document.addEventListener('touchend', (e) => {
+      const start = touchStart
+      touchStart = null
+      const t = e.changedTouches && e.changedTouches[0]
+      const tap = !!(start && t && Math.abs(t.clientX - start.x) < 12 && Math.abs(t.clientY - start.y) < 12 && Date.now() - start.at < 350)
+      const onControl = !!(e.target && e.target.closest && e.target.closest(DOUBLE_TAP_IGNORE))
+      if (!tap || onControl) { lastTap = 0; return }
       const now = Date.now()
       if (now - lastTap < 300) {
         // Сбрасываем метку сразу: иначе третье касание подряд попадает в то же окно
-        // и запускает отправку заново — случайный лишний тап сбивал очередь.
+        // и запускает отправку заново.
         lastTap = 0
         const singleMode = SINGLE_BLOCK_SUBJECTS.includes(currentSubject)
         if (singleMode && lastAnswer) {
           resendToWatch()
         } else if (lastTasks.length > 0) {
           // Двойное касание запускает отправку с ПЕРВОГО задания и дальше по очереди.
-          // Раньше каждое касание слало следующее по счёту, и после последнего одно
-          // касание уходило впустую на сброс счётчика — с середины урока было не понять,
-          // на каком задании ты остановился.
           nextTaskIdx = 0
           autoSendAllTasks(lastTasks)
         }
@@ -1662,7 +2289,6 @@ SKIP, если фраза — что угодно из:
       }
       lastTap = now
     })
-
     async function resendToWatch() {
       if (!lastAnswer) return
       const btn = document.getElementById('resultResendBtn')
@@ -1680,11 +2306,22 @@ SKIP, если фраза — что угодно из:
     // ===== Съёмка нескольких листов =====
     // Системная камера отдаёт по одному снимку за раз, поэтому копим их сами:
     // нажал «3» — снимаешь три листа подряд, и только потом всё уходит в модель
-    // одним запросом. Между снимками кнопка показывает, сколько осталось.
+    // одним запросом.
+    //
+    // Под iPhone здесь три правила:
+    // 1. Safari открывает камеру только по прямому нажатию. Вызов из обработчика
+    //    готового снимка он молча игнорирует, поэтому между листами на весь экран
+    //    встаёт заставка: нажатие в любом её месте и есть нужное нажатие.
+    // 2. Снимок из input нельзя откладывать: после сброса value и повторного открытия
+    //    камеры прежний файл на iPhone становится нечитаемым. Байты копируем сразу.
+    // 3. Сжимаем листы строго по одному (filesToBase64): несколько декодированных
+    //    снимков по 12 Мп разом Safari не вытягивает и перезагружает страницу.
     let shotsNeeded = 1
     let shotsCollected = []
+    let shotReading = false
 
     function startShooting(n) {
+      if (shotReading) return
       shotsNeeded = n
       shotsCollected = []
       // Кнопки листов видны и после разбора, когда основная кнопка спрятана. Начали
@@ -1696,6 +2333,7 @@ SKIP, если фраза — что угодно из:
     }
 
     function shootButtonAction() {
+      if (shotReading) return
       // Дожимаем начатую серию, если она не закончена, иначе начинаем новую с одного листа.
       if (shotsCollected.length && shotsCollected.length < shotsNeeded) {
         document.getElementById('camera').click()
@@ -1704,21 +2342,68 @@ SKIP, если фраза — что угодно из:
       }
     }
 
-    function updateShootButton() {
-      const btn = document.getElementById('shootBtn')
-      const left = shotsNeeded - shotsCollected.length
-      btn.textContent = (shotsNeeded > 1 && shotsCollected.length)
-        ? `Снимок ${shotsCollected.length + 1} из ${shotsNeeded}`
-        : 'Фото'
-      btn.style.background = left > 0 && shotsCollected.length ? '#F57C00' : ''
+    // Нажатие на заставку между листами.
+    function continueShooting() {
+      if (shotReading) return
+      document.getElementById('camera').click()
     }
 
-    function onPhotoInput(input) {
-      const files = Array.from(input.files)
-      // Сбрасываем значение: без этого повторный выбор того же файла не даёт события,
-      // и второй снимок той же страницы просто не приходит.
-      input.value = ''
-      if (!files.length) return
+    function cancelShooting() {
+      shotsNeeded = 1
+      shotsCollected = []
+      updateShootButton()
+    }
+
+    function updateShootButton() {
+      const btn = document.getElementById('shootBtn')
+      const pending = shotsNeeded > 1 && shotsCollected.length > 0 && shotsCollected.length < shotsNeeded
+      btn.textContent = pending ? `Снимок ${shotsCollected.length + 1} из ${shotsNeeded}` : 'Фото'
+      if (pending) btn.dataset.state = 'series'
+      else delete btn.dataset.state
+      document.getElementById('shotOverlay').classList.toggle('open', pending)
+      if (pending) {
+        setText('shotCount', `${shotsCollected.length + 1} из ${shotsNeeded}`)
+        setText('shotHint', `Снято листов: ${shotsCollected.length}. Нажми в любом месте, чтобы снять следующий`)
+      }
+    }
+
+    // Копия снимка в памяти, не зависящая от input (правило 2).
+    async function detachFile(file) {
+      const buf = typeof file.arrayBuffer === 'function'
+        ? await file.arrayBuffer()
+        : await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result)
+            reader.onerror = () => reject(reader.error || new Error('read failed'))
+            reader.readAsArrayBuffer(file)
+          })
+      return new Blob([buf], { type: file.type || 'image/jpeg' })
+    }
+
+    async function onPhotoInput(input) {
+      const picked = Array.from(input.files || [])
+      if (!picked.length) { input.value = ''; return }
+      shotReading = true
+      let files = []
+      try {
+        for (const file of picked) files.push(await detachFile(file))
+      } catch (e) {
+        files = null
+      } finally {
+        shotReading = false
+        // Сбрасываем только после копии. Сброс нужен: без него повторный выбор того же
+        // файла из галереи не даёт события change.
+        input.value = ''
+      }
+      if (!files) {
+        if (document.getElementById('shotOverlay').classList.contains('open')) {
+          setText('shotHint', 'Снимок не прочитался. Нажми, чтобы снять этот лист ещё раз')
+        } else {
+          setText('errorText', 'Не удалось прочитать снимок — сними ещё раз')
+          block('errorCard')
+        }
+        return
+      }
       // Галерея отдаёт нужное количество файлов сразу — счётчик листов ей не нужен.
       if (input.id === 'gallery') {
         shotsNeeded = 1
@@ -1730,11 +2415,6 @@ SKIP, если фраза — что угодно из:
       shotsCollected.push(files[0])
       if (shotsCollected.length < shotsNeeded) {
         updateShootButton()
-        // Открываем камеру под следующий лист сразу, СИНХРОННО внутри обработчика:
-        // так вызов ещё попадает в окно пользовательского действия и Safari его
-        // пропускает. Если всё же не откроется — кнопка уже показывает «Снимок N из M»
-        // и остаётся запасным путём.
-        try { document.getElementById('camera').click() } catch {}
         return
       }
       const all = shotsCollected
@@ -1757,46 +2437,31 @@ SKIP, если фраза — что угодно из:
       block('galleryBtn2')
       hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
       hide('errorCard')
+      // Пока модель думает — заготовки карточек; прежний ответ убираем, чтобы не спутать его с новым.
+      hide('tasksList'); hide('tasksHeader')
+      show('loadingCards')
       document.getElementById('savePhotoBtn').style.display = 'block'
-
-      show('status')
-      startTimer()
 
       let wakeLock = null
       try { wakeLock = await navigator.wakeLock.request('screen') } catch {}
 
-      const images = await Promise.all(files.map(toBase64))
+      let early = null
       try {
-        const data = await analyzePhotos(images)
+        // Сжатие внутри try: если лист не прочитался, раньше ошибка улетала мимо
+        // и загрузка крутилась бесконечно.
+        const images = await filesToBase64(files)
+        early = startEarlyTasks(currentSubject)
+        const data = await analyzePhotos(images, early && early.onText)
         if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
-        const displayAnswer = currentSubject === 'geometry' ? parseAndRenderGeometry(data.answer) : (renderFigure(null), data.answer)
-        lastAnswer = stripTasksMarker(displayAnswer)
-        lastTasks = splitTasks(displayAnswer)
-        nextTaskIdx = 0
-        stopTimer()
-        hide('status')
-        const usedModel = data.model || currentModel
-        if (lastTasks.length > 1 && !SINGLE_BLOCK_SUBJECTS.includes(currentSubject)) {
-          hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
-          renderTasks(lastTasks)
-          autoSendAllTasks(lastTasks)
-        } else {
-          document.getElementById('tasksList').style.display = 'none'
-          setText('resultText', lastAnswer)
-
-          document.getElementById('resultHeader').style.display = 'block'
-          document.getElementById('resultResendBtn').style.display = 'block'
-          document.getElementById('resultCost').textContent = ''
-          block('resultCard')
-          notifyAnswer(lastAnswer)
-        }
+        showPhotoAnswer(data, early)
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch (e) {
-        stopTimer()
-        hide('status')
         setText('errorText', e.message || 'Не удалось подключиться к серверу')
         block('errorCard')
       }
+      hide('loadingCards')
+      // Ответ закончен или не пришёл: очередь больше не ждёт новых заданий.
+      if (early) early.live = false
       if (wakeLock) try { wakeLock.release() } catch {}
     }
   </script>
