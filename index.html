@@ -34,6 +34,8 @@
       --mint: #5EF3A0;
       --mint-press: #48E48C;
       --mint-soft: #DDFBE8;
+      /* Текст на мятном: серый на нём не читается. */
+      --mint-ink: #0E6B3E;
       --danger: #E5484D;
       --danger-soft: #FDECEC;
       --r-card: 8px;
@@ -244,6 +246,7 @@
     .task-btn:active { background: var(--fill); }
     .task-btn[data-state="sending"] { background: var(--btn-dark); border-color: var(--btn-dark); color: #fff; }
     .task-btn[data-state="done"] { background: var(--mint); border-color: var(--mint); color: var(--ink); }
+    .task-btn[data-state="done"] .task-sub { color: var(--mint-ink); }
     .task-btn[data-state="error"] { background: var(--danger-soft); border-color: var(--danger-soft); color: var(--danger); }
 
     .tasks-list { display: none; flex-direction: column; gap: 10px; width: 100%; max-width: var(--col); margin-top: 12px; }
@@ -257,7 +260,7 @@
       gap: 8px;
     }
     .task-num { font-size: 12px; font-weight: 500; color: var(--muted); }
-    /* Буква пункта в подписи «1 (а)» — серая и на кнопке, и на карточке. */
+    /* Буква пункта в подписи «1 (а)» — серая на карточке и на кнопке; на отправленной кнопке — тёмно-зелёная. */
     .task-sub { color: var(--muted); font-weight: 500; }
     .task-text { font-size: 15px; line-height: 1.55; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
     .heard { font-size: 12px; color: var(--muted); line-height: 1.4; word-break: break-word; }
@@ -445,7 +448,7 @@
     <button class="icon-btn" onclick="openSettingsForTab()" aria-label="Настройки">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
     </button>
-    <a class="brand" href="https://dophamine2.github.io/taskai/"><span class="logo">Tutor</span><span class="version">v82</span></a>
+    <a class="brand" href="https://dophamine2.github.io/taskai/"><span class="logo">Tutor</span><span class="version">v83</span></a>
     <button id="modelBtn" class="pill" data-state="flash" onclick="toggleModel()">Gemini</button>
   </header>
 
@@ -1284,6 +1287,10 @@
     const WAVE_MAX_H = 34
     const WAVE_STEP_MS = 70
     const WAVE_HEAD = 10
+    // Полоска появляется, когда звук на 6 дБ громче фона. Полная высота — самый громкий звук
+    // последних секунд, но не ближе 20 дБ к фону: иначе в тишине шорох вырастал бы в полную полоску.
+    const WAVE_GATE_DB = 6
+    const WAVE_MIN_RANGE_DB = 20
 
     const VOICE_QUESTION_PROMPT = `Ты помогаешь ученику на уроке истории. Ниже текст, записанный голосом и распознанный автоматически. Это вопрос — учителя классу или самого ученика, иногда вместе с пояснениями вокруг. В распознавании бывают ошибки в словах и именах — понимай по смыслу.
 
@@ -1536,7 +1543,7 @@
         rec.chunks.push(chunk)
         rec.samples += chunk.length
       }
-      // Полоски берут сырой сигнал отдельной веткой.
+      // Полоски слушают ту же полосу речи, что уходит в запись: гул стульев ниже 80 Гц их не поднимает.
       rec.analyser = ctx.createAnalyser()
       rec.analyser.fftSize = 1024
       // Тихий гейн держит граф живым (Safari иначе не обрабатывает ни воркл, ни анализатор),
@@ -1547,7 +1554,7 @@
       highpass.connect(lowpass)
       lowpass.connect(rec.worklet)
       rec.worklet.connect(silent)
-      source.connect(rec.analyser)
+      lowpass.connect(rec.analyser)
       rec.analyser.connect(silent)
       silent.connect(ctx.destination)
     }
@@ -1582,18 +1589,37 @@
       }
       // На одну полоску больше, чем помещается: крайняя справа въезжает, а не выскакивает.
       rec.levels = new Array(Math.ceil(w / WAVE_PITCH) + 1).fill(0)
-      const samples = new Uint8Array(rec.analyser.fftSize)
-      let noiseFloor = 0.02
+      // Отсчёты берём дробные: у байтовых шаг 1/128, и голос в паре метров от iPhone
+      // (амплитуда — сотые доли) округлялся почти в ноль. Полоски вырастали, только если
+      // говорить в сам микрофон.
+      const floatData = typeof rec.analyser.getFloatTimeDomainData === 'function'
+      const samples = floatData ? new Float32Array(rec.analyser.fftSize) : new Uint8Array(rec.analyser.fftSize)
+      // Громкость — в децибелах над фоном: голос у доски и голос у самого телефона различаются
+      // по амплитуде в десятки раз, и в линейной шкале первый не был виден. Фон отслеживаем
+      // (вниз быстро, вверх медленно), потолок — самое громкое за последние секунды.
+      let floorDb = null
+      let peakDb = -Infinity
       let lastStep = 0
       const frame = (t) => {
         if (voiceRec !== rec || rec.state !== 'recording') return
-        rec.analyser.getByteTimeDomainData(samples)
         let sum = 0
-        for (let i = 0; i < samples.length; i++) { const v = (samples[i] - 128) / 128; sum += v * v }
-        const rms = Math.sqrt(sum / samples.length)
-        // Фон класса отслеживаем, чтобы гул не поднимал полоски: вниз быстро, вверх медленно.
-        noiseFloor = rms < noiseFloor ? noiseFloor * 0.9 + rms * 0.1 : noiseFloor * 0.998 + rms * 0.002
-        const target = Math.min(1, Math.pow(Math.max(0, rms - noiseFloor * 1.8) * 8, 0.7))
+        if (floatData) {
+          rec.analyser.getFloatTimeDomainData(samples)
+          for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i]
+        } else {
+          rec.analyser.getByteTimeDomainData(samples)
+          for (let i = 0; i < samples.length; i++) { const v = (samples[i] - 128) / 128; sum += v * v }
+        }
+        let target = 0
+        // Пока микрофон просыпается, приходят ровные нули — по ним фон не считаем.
+        if (sum > 0) {
+          const db = 10 * Math.log10(sum / samples.length)
+          // Первый звук может быть стуком по экрану — фон стартует не выше −50 дБ.
+          floorDb = floorDb === null ? Math.min(db, -50) : floorDb + (db - floorDb) * (db < floorDb ? 0.1 : 0.003)
+          peakDb = Math.max(db, peakDb - 0.08)
+          const top = Math.max(peakDb, floorDb + WAVE_MIN_RANGE_DB)
+          target = Math.min(1, Math.max(0, (db - floorDb - WAVE_GATE_DB) / (top - floorDb - WAVE_GATE_DB)))
+        }
         // Полоска вырастает быстро, а опадает мягко — без дёрганья.
         rec.smooth += (target - rec.smooth) * (target > rec.smooth ? 0.55 : 0.2)
         if (!lastStep) lastStep = t
@@ -2016,13 +2042,13 @@
 
     // ===== Очередь заданий на часы =====
     // Задания уходят строго по очереди, с первого по последнее: части одного задания — с паузой
-    // 30 с, между заданиями — 3 минуты, после последнего очередь останавливается сама.
+    // 30 с, между заданиями — 2 минуты, после последнего очередь останавливается сама.
     // Короткие ответы без решения («135», «расположенный»), идущие подряд, уходят одним
-    // сообщением списком: по одному раз в три минуты четыре ответа русского шли бы девять минут.
+    // сообщением списком: по одному раз в две минуты четыре ответа русского шли бы шесть минут.
     // Следующий шаг заводится только после предыдущего: если iPhone приостановил страницу,
     // после возврата части не вываливаются пачкой, а идут дальше с тем же шагом.
     const PART_GAP_MS = 30 * 1000
-    const TASK_GAP_MS = 3 * 60 * 1000
+    const TASK_GAP_MS = 2 * 60 * 1000
     const SHORT_TASK_MAX = 40
     let autoSendCancel = null
     let sendWakeLock = null
