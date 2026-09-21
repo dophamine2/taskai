@@ -1055,6 +1055,7 @@
       const build = (model) => ({
         model,
         ...photoParams(model),
+        ...(currentSubject === 'russian' ? { plugins: [{ id: 'web' }] } : {}),
         messages: [{
           role: 'user',
           content: [
@@ -1074,6 +1075,13 @@
         usedModel = MODEL_FAST
         if (result.network) await pageReadyForNetwork()
         result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay)
+      }
+      // Плагин в теле запроса сам по себе ничего не доказывает: модель решает, искать ли,
+      // и иногда отвечает из своих знаний, не сходив в интернет. Настоящее подтверждение —
+      // счётчик реальных обращений к поиску, который Polza кладёт в usage.server_tool_use.
+      if (currentSubject === 'russian' && result.ok) {
+        const hits = result.usage?.server_tool_use?.web_search_requests
+        console.log('[web-поиск, русский]', hits ? `сработал, запросов: ${hits}` : 'НЕ сработал в этом ответе (модель ответила без поиска)', result.usage)
       }
       return { ...result, model: usedModel }
     }
@@ -2280,41 +2288,7 @@
       if (early) early.live = false
     }
 
-    let lastTap = 0
     let nextTaskIdx = 0
-    let touchStart = null
-    // Двойное касание засчитывается только по пустому месту и только как два коротких тапа
-    // без сдвига. Раньше его ловило что угодно: двойной тап по номеру «4» перезапускал отправку
-    // с первого задания, как и свайп с последующим касанием или тапы в настройках.
-    const DOUBLE_TAP_IGNORE = 'button, a, input, select, textarea, label, canvas, .modal-overlay, .voice-panel, .shot-overlay'
-    document.addEventListener('touchstart', (e) => {
-      const t = e.touches && e.touches[0]
-      touchStart = e.touches && e.touches.length === 1 && t ? { x: t.clientX, y: t.clientY, at: Date.now() } : null
-    }, { passive: true })
-    document.addEventListener('touchend', (e) => {
-      const start = touchStart
-      touchStart = null
-      const t = e.changedTouches && e.changedTouches[0]
-      const tap = !!(start && t && Math.abs(t.clientX - start.x) < 12 && Math.abs(t.clientY - start.y) < 12 && Date.now() - start.at < 350)
-      const onControl = !!(e.target && e.target.closest && e.target.closest(DOUBLE_TAP_IGNORE))
-      if (!tap || onControl) { lastTap = 0; return }
-      const now = Date.now()
-      if (now - lastTap < 300) {
-        // Сбрасываем метку сразу: иначе третье касание подряд попадает в то же окно
-        // и запускает отправку заново.
-        lastTap = 0
-        const singleMode = SINGLE_BLOCK_SUBJECTS.includes(currentSubject)
-        if (singleMode && lastAnswer) {
-          resendToWatch()
-        } else if (lastTasks.length > 0) {
-          // Двойное касание запускает отправку с ПЕРВОГО задания и дальше по очереди.
-          nextTaskIdx = 0
-          autoSendAllTasks(lastTasks)
-        }
-        return
-      }
-      lastTap = now
-    })
     async function resendToWatch() {
       if (!lastAnswer) return
       const btn = document.getElementById('resultResendBtn')
