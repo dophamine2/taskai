@@ -448,7 +448,7 @@
     <button class="icon-btn" onclick="openSettingsForTab()" aria-label="Настройки">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
     </button>
-    <a class="brand" href="https://dophamine2.github.io/taskai/"><span class="logo">Tutor</span><span class="version">v83</span></a>
+    <a class="brand" href="https://dophamine2.github.io/taskai/"><span class="logo">Tutor</span><span class="version">v84</span></a>
     <button id="modelBtn" class="pill" data-state="flash" onclick="toggleModel()">Gemini</button>
   </header>
 
@@ -872,7 +872,7 @@
     const SINGLE_BLOCK_SUBJECTS = ['society', 'history', 'other']
 
     // Длинный ответ (предметы без деления на задания) шлём половинами. Первая уходит сразу,
-    // частями с паузой 30 с, вторая — через пять минут после последней части первой. Иначе
+    // частями с паузой 15 с, вторая — через пять минут после последней части первой. Иначе
     // на часы за раз валится полтора десятка уведомлений и прочитать их на уроке невозможно.
     const HALF_GAP_MS = 5 * 60 * 1000
     let lastWatchChunks = []
@@ -951,10 +951,14 @@
     // Единая точка обращения к Polza — раньше этим занимался server.ts.
     // onText — просить ответ потоком: onText получает весь текст, накопленный к этому моменту,
     // и разбор фото показывает задания по мере готовности, не дожидаясь конца ответа.
-    async function callPolza(body, timeoutMs, onText) {
+    async function callPolza(body, timeoutMs, onText, signal) {
       if (!apiKeys.polza) return { ok: false, error: 'Не задан ключ Polza — открой настройки' }
       const ctrl = new AbortController()
       const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+      if (signal) {
+        if (signal.aborted) ctrl.abort()
+        else signal.addEventListener('abort', () => ctrl.abort(), { once: true })
+      }
       try {
         const res = await fetch('https://polza.ai/api/v1/chat/completions', {
           method: 'POST',
@@ -1049,7 +1053,8 @@
 
     // onText — показ ответа по кускам. Только пока ни одна попытка не выдала текст: если поток
     // оборвался на середине, повтор идёт обычным запросом, а задания сверяются с полным ответом.
-    async function analyzePhotos(images, onText) {
+    // extra — вставки с рисунками (graphInserts), signal — отмена, когда ответ уже не нужен.
+    async function solvePhotos(images, extra, onText, signal) {
       let streamed = false
       const relay = onText && ((text) => { streamed = true; onText(text) })
       const build = (model) => ({
@@ -1060,22 +1065,27 @@
           role: 'user',
           content: [
             ...images.map(img => ({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + img } })),
-            { type: 'text', text: PROMPTS[currentSubject] }
+            ...extra,
+            { type: 'text', text: PROMPTS[currentSubject] + (extra.length ? ' ' + GRAPH_RULES : '') }
           ]
         }]
       })
+      const cancelled = { ok: false, error: 'Отменено' }
       let usedModel = currentModel
-      let result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay)
+      let result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay, signal)
       for (let attempt = 1; !result.ok && attempt <= (result.network ? 2 : 1); attempt++) {
+        if (signal?.aborted) return cancelled
         await new Promise(resolve => setTimeout(resolve, result.network ? attempt * 3000 - 1000 : 1000))
         if (result.network) await pageReadyForNetwork()
-        result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay)
+        if (signal?.aborted) return cancelled
+        result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay, signal)
       }
-      if (!result.ok && usedModel === MODEL_STRONG) {
+      if (!result.ok && usedModel === MODEL_STRONG && !signal?.aborted) {
         usedModel = MODEL_FAST
         if (result.network) await pageReadyForNetwork()
-        result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay)
+        result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay, signal)
       }
+      if (signal?.aborted) return cancelled
       // Плагин в теле запроса сам по себе ничего не доказывает: модель решает, искать ли,
       // и иногда отвечает из своих знаний, не сходив в интернет. Настоящее подтверждение —
       // счётчик реальных обращений к поиску, который Polza кладёт в usage.server_tool_use.
@@ -1084,6 +1094,34 @@
         console.log('[web-поиск, русский]', hits ? `сработал, запросов: ${hits}` : 'НЕ сработал в этом ответе (модель ответила без поиска)', result.usage)
       }
       return { ...result, model: usedModel }
+    }
+
+    // Разбор фото. В предметах, где бывают графики, одновременно с обычным решением ищем на фото
+    // рисунки с сеткой, а показ решения придерживаем до ответа поиска (~5 с — столько же, сколько
+    // модель пишет первое задание, поэтому фото без рисунков не ждут дольше прежнего). Нашлись
+    // рисунки — обычное решение отменяем и решаем заново с выпрямленными подписанными рисунками.
+    // Opus дорогой, его зря не запускаем: сначала поиск, потом одно решение.
+    async function analyzePhotos(images, onText, files) {
+      if (!files || !files.length || !GRAPH_SUBJECTS.includes(currentSubject)) return solvePhotos(images, [], onText)
+      const found = findGraphs(images).catch(() => [])
+      const withGraphs = async () => {
+        const list = await found
+        if (!list.length) return []
+        try { return await graphInserts(files, list) } catch { return [] }
+      }
+      if (currentModel === MODEL_STRONG) return solvePhotos(images, await withGraphs(), onText)
+      let held = null, open = false
+      const ctrl = new AbortController()
+      const plain = solvePhotos(images, [], onText && ((text) => { if (open) onText(text); else held = text }), ctrl.signal)
+      const extra = await withGraphs()
+      if (!extra.length) {
+        open = true
+        if (held !== null) onText(held)
+        return plain
+      }
+      ctrl.abort()
+      console.log('[графики] рисунков с сеткой:', extra.filter(x => x.type === 'image_url').length)
+      return solvePhotos(images, extra, onText)
     }
 
     // Повтор после обрыва ждёт, пока приложение снова на экране и сеть есть: из свёрнутого
@@ -1103,6 +1141,1022 @@
         window.addEventListener('online', check)
         document.addEventListener('visibilitychange', check)
       })
+    }
+
+    // ===== Графики и рисунки на клетках =====
+    // Модели плохо считают клетки: на снимке листа график занимает пару сотен пикселей, модель
+    // сжимает весь снимок и путает соседние узлы — касательную через (−3; −3) и (2; 5) читала
+    // через (1; 5), ответ 2 вместо 1,6. Поэтому рисунок с сеткой разбирает код: находит линии
+    // сетки и оси, выпрямляет рисунок (каждая клетка — ровный квадрат), подписывает каждую линию
+    // её значением и сам меряет прямые — через какие узлы проходят и какой у них наклон.
+    // Модели остаётся прочитать подписи и решить. Где рисунки на фото — спрашиваем у Gemini.
+    const GRAPH_SUBJECTS = ['algebra', 'geometry', 'physics', 'other']
+    const GRAPH_FIND_PROMPT = 'Найди на фото рисунки к заданиям с координатной сеткой или клетками: графики функций и производных, прямые и векторы на клетчатой плоскости, фигуры на клетках, графики зависимостей в физике. Клетки самой тетради, на которой написан текст, — не рисунок. Для каждого рисунка верни рамку box_2d = [ymin, xmin, ymax, xmax] в долях 0–1000 от размеров снимка — рамка охватывает весь рисунок вместе с подписями осей и чисел — и номер задания, к которому он относится. Ответ — только JSON без пояснений: [{"box_2d": [ymin, xmin, ymax, xmax], "task": "7"}]. Если таких рисунков нет — [].'
+    const GRAPH_RULES = 'К фото приложены увеличенные и выпрямленные рисунки с сеткой (подписано, к какому заданию). По краям такого рисунка программа подписала каждую линию сетки её значением: красные числа сверху и снизу — x, синие слева и справа — y, отсчёт от осей, одна клетка = 1. Эти подписи точные — координаты бери по ним, клетки вручную не пересчитывай. Если числа, напечатанные на самом рисунке, показывают другую цену клетки (например 0, 2, 4 или 0, 5, 10), переводи по напечатанным. Если сказано, что осей нет, подписи — просто линейка по клеткам: координаты векторов считай как разности. Рядом могут быть измерения программы: узлы, через которые проходит прямая, её наклон; отрезки с концами в узлах (стороны фигур, векторы, участки графиков в физике); окружность — центр и r²; для кривой — узлы сетки, через которые она проходит (по ним находят коэффициенты формулы: подставь координаты узлов), где она пересекает ось x и в какую сторону, где касается оси, её вершины и впадины. Координаты в измерениях — в клетках по подписям программы; если цена клетки по напечатанным числам другая (в физике часто 2, 5, 10), переведи. Измерения точнее, чем на глаз, — опирайся на них, а по рисунку проверяй то, чего в них нет. Уровень y = c кривая пересекает между соседними вершиной и впадиной, если c лежит между их значениями, — так удобно считать точки, где f\'(x) = c. Прямая или касательная: наклон k = (y2 - y1)/(x2 - x1) по двум узлам сетки, через которые она проходит; проверь: прямая поднимается слева направо — k > 0, опускается — k < 0. Производная в точке касания равна наклону касательной. График производной y = f\'(x): максимум f — где график f\' переходит через ось x сверху вниз (с + на -), минимум f — снизу вверх; касание оси без перехода — не экстремум; f возрастает там, где график f\' выше оси, убывает — где ниже. График функции y = f(x): точки экстремума — вершины и впадины графика, в них f\'(x) = 0; f\'(x) > 0 там, где график поднимается, f\'(x) < 0 — где опускается. Учитывай только точки внутри заданного отрезка или интервала; точку у самой границы сверяй по подписям линий. В решении задания с рисунком сначала одной строкой запиши, что прочитал с рисунка (узлы прямой, нули f\' со сменой знака, координаты точек), потом вычисление.'
+
+    // Где на снимках рисунки с сеткой: [{ image, box, task }]. Ошибка или долгий ответ — считаем,
+    // что рисунков нет, и решаем как обычно.
+    async function findGraphs(images) {
+      const one = async (img, image) => {
+        const res = await callPolza({
+          model: MODEL_FAST,
+          max_tokens: 1000,
+          ...modelParams(MODEL_FAST, 'minimal'),
+          messages: [{ role: 'user', content: [
+            { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + img } },
+            { type: 'text', text: GRAPH_FIND_PROMPT }
+          ] }]
+        }, 15000)
+        if (!res.ok) return []
+        const m = res.answer.match(/\[[\s\S]*\]/)
+        let list = []
+        try { list = JSON.parse(m ? m[0] : '[]') } catch { return [] }
+        return (Array.isArray(list) ? list : []).filter(it => {
+          const b = it && it.box_2d
+          if (!Array.isArray(b) || b.length !== 4 || !b.every(v => Number.isFinite(v) && v >= 0 && v <= 1000)) return false
+          // Рамка не меньше ~3% стороны снимка и не во весь лист.
+          return b[2] - b[0] > 30 && b[3] - b[1] > 30 && (b[2] - b[0]) * (b[3] - b[1]) < 700000
+        }).map(it => ({ image, box: it.box_2d, task: String(it.task ?? '').replace(/[^\dа-яa-z.]/gi, '').slice(0, 6) }))
+      }
+      const all = await Promise.all(images.map((img, i) => one(img, i).catch(() => [])))
+      return all.flat().slice(0, 6)
+    }
+
+    function loadImageFile(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image()
+        const url = URL.createObjectURL(file)
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img) }
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Не удалось прочитать файл')) }
+        img.src = url
+      })
+    }
+
+    // Один рисунок: вырезка из полного снимка → выпрямленная картинка с подписями и измерения.
+    function graphFigure(img, box) {
+      const W = img.width, H = img.height
+      const [y0, x0, y1, x1] = box.map(v => v / 1000)
+      const padX = (x1 - x0) * 0.06, padY = (y1 - y0) * 0.06
+      const sx = Math.max(0, (x0 - padX) * W), sy = Math.max(0, (y0 - padY) * H)
+      const sw = Math.min(W, (x1 + padX) * W) - sx, sh = Math.min(H, (y1 + padY) * H) - sy
+      // Рабочий размер — 800 по длинной стороне: клетка выходит в 40–60 пикселей.
+      const k = 800 / Math.max(sw, sh)
+      const w = Math.round(sw * k), h = Math.round(sh * k)
+      const c = document.createElement('canvas')
+      c.width = w; c.height = h
+      const ctx = c.getContext('2d', { willReadFrequently: true })
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h)
+      const rgba = ctx.getImageData(0, 0, w, h).data
+      const gray = new Uint8Array(w * h)
+      for (let i = 0; i < w * h; i++) gray[i] = (rgba[4 * i] * 299 + rgba[4 * i + 1] * 587 + rgba[4 * i + 2] * 114) / 1000
+      let g = null
+      try { g = gridAnalyze(gray, w, h) } catch {}
+      // Сетку не нашли или она огромная (клетки тетради) — отдаём просто увеличенную вырезку.
+      if (!g || g.nV > 26 || g.nH > 26) {
+        const data = c.toDataURL('image/jpeg', 0.88).split(',')[1]
+        c.width = 0; c.height = 0
+        return { data, hint: '' }
+      }
+      const M = 1.2, C = Math.min(64, Math.floor(1000 / (Math.max(g.nV, g.nH) - 1 + 2 * M)))
+      const RW = Math.round((g.nV - 1 + 2 * M) * C), RH = Math.round((g.nH - 1 + 2 * M) * C)
+      const out = ctx.createImageData(RW, RH)
+      const rg = new Uint8Array(RW * RH)
+      const px = (x, y, ch) => rgba[(Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))) * 4 + ch]
+      gridRectify(g, C, M, (x, y, q) => {
+        const xi = Math.floor(x), yi = Math.floor(y), a = x - xi, b = y - yi
+        for (let ch = 0; ch < 3; ch++) {
+          out.data[q * 4 + ch] = (1 - a) * (1 - b) * px(xi, yi, ch) + a * (1 - b) * px(xi + 1, yi, ch) + (1 - a) * b * px(xi, yi + 1, ch) + a * b * px(xi + 1, yi + 1, ch)
+        }
+        out.data[q * 4 + 3] = 255
+        rg[q] = (out.data[q * 4] * 299 + out.data[q * 4 + 1] * 587 + out.data[q * 4 + 2] * 114) / 1000
+      })
+      const lines = gridMeasureLines(g, rg, RW, RH, C, M)
+      c.width = 0; c.height = 0
+      // Подписи линий — на белой рамке вокруг рисунка, чтобы не закрыть напечатанное.
+      const B = 28
+      const f = document.createElement('canvas')
+      f.width = RW + 2 * B; f.height = RH + 2 * B
+      const fx = f.getContext('2d')
+      fx.fillStyle = '#FFFFFF'
+      fx.fillRect(0, 0, f.width, f.height)
+      fx.putImageData(out, B, B)
+      fx.font = 'bold 16px Arial, sans-serif'
+      fx.textBaseline = 'middle'
+      fx.fillStyle = '#D00000'
+      fx.textAlign = 'center'
+      for (let i = 0; i < g.nV; i++) {
+        const x = B + (i + M) * C, v = String(i - g.i0)
+        fx.fillText(v, x, B / 2)
+        fx.fillText(v, x, RH + B + B / 2)
+      }
+      fx.fillStyle = '#0040D0'
+      for (let j = 0; j < g.nH; j++) {
+        const y = B + (g.nH - 1 - j + M) * C, v = String(j - g.j0)
+        fx.textAlign = 'right'; fx.fillText(v, B - 4, y)
+        fx.textAlign = 'left'; fx.fillText(v, RW + B + 4, y)
+      }
+      const data = f.toDataURL('image/jpeg', 0.88).split(',')[1]
+      f.width = 0; f.height = 0
+      // Стороны на линиях сетки, отсев кусочков кривых, затем кривые (с узлами) и окружности.
+      let figLines = lines, curves = [], circles = []
+      try { figLines = gridPruneSegments(g, rg, RW, RH, C, M, lines.concat(gridMeasureOnGrid(g, rg, RW, RH, C, M))) } catch {}
+      try { curves = gridMeasureCurves(g, rg, RW, RH, C, M, figLines); circles = gridFindCircles(curves) } catch {}
+      const hint = figureHint(g, figLines, curves, circles)
+      return { data, hint }
+    }
+
+    // Вставки в запрос: для каждого рисунка — подпись, выпрямленная картинка и измерения.
+    async function graphInserts(files, found) {
+      const out = []
+      const byImage = {}
+      for (const it of found) (byImage[it.image] = byImage[it.image] || []).push(it)
+      for (const [idx, list] of Object.entries(byImage)) {
+        const file = files[+idx]
+        if (!file) continue
+        let img
+        try { img = await loadImageFile(file) } catch { continue }
+        for (const it of list) {
+          let fig
+          try { fig = graphFigure(img, it.box) } catch { continue }
+          const where = (it.task ? ` к заданию ${it.task}` : '') + (files.length > 1 ? ` (лист ${+idx + 1})` : '')
+          out.push({ type: 'text', text: 'Увеличенный рисунок' + where + ':' })
+          out.push({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + fig.data } })
+          if (fig.hint) out.push({ type: 'text', text: 'Измерения программы по этому рисунку:' + fig.hint })
+        }
+        img.src = ''
+      }
+      return out
+    }
+
+    // Разбор клетчатого рисунка по пикселям: сетка, оси, прямые, отрезки, кривые, окружности. gray — яркости (0 — чёрный), w × h.
+    // «Темнота» пикселя относительно местного фона: фон — среднее по окну, бумага на снимке
+    // освещена неровно, общий порог не годится.
+    function darkMap(gray, w, h) {
+      const r = Math.max(8, Math.round(Math.max(w, h) / 40))
+      const integ = new Float64Array((w + 1) * (h + 1))
+      for (let y = 0; y < h; y++) {
+        let row = 0
+        for (let x = 0; x < w; x++) {
+          row += gray[y * w + x]
+          integ[(y + 1) * (w + 1) + x + 1] = integ[y * (w + 1) + x + 1] + row
+        }
+      }
+      const dark = new Float32Array(w * h)
+      for (let y = 0; y < h; y++) {
+        const y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1)
+        for (let x = 0; x < w; x++) {
+          const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1)
+          const s = integ[y1 * (w + 1) + x1] - integ[y0 * (w + 1) + x1] - integ[y1 * (w + 1) + x0] + integ[y0 * (w + 1) + x0]
+          const d = s / ((x1 - x0) * (y1 - y0)) - gray[y * w + x]
+          dark[y * w + x] = d > 6 ? d : 0
+        }
+      }
+      return dark
+    }
+
+    function gridAnalyze(gray, w, h) {
+      const dark = darkMap(gray, w, h)
+      const D = (x, y) => {
+        const xi = Math.round(x), yi = Math.round(y)
+        return xi < 0 || yi < 0 || xi >= w || yi >= h ? 0 : dark[yi * w + xi]
+      }
+
+      // 2. Преобразование Хафа, координаты от центра картинки: (x − cx)·cosθ + (y − cy)·sinθ = ρ.
+      // θ от −90° до 90° с шагом 0,5°: вертикальные линии около 0°, горизонтальные около ±90°.
+      const cx = w / 2, cy = h / 2
+      const NT = 360, dT = Math.PI / NT, T0 = -NT / 2
+      const R = Math.ceil(Math.hypot(w, h) / 2) + 2, NR = 2 * R + 1
+      const cos = new Float32Array(NT), sin = new Float32Array(NT)
+      for (let t = 0; t < NT; t++) { cos[t] = Math.cos((t + T0) * dT); sin[t] = Math.sin((t + T0) * dT) }
+      const acc = new Float32Array(NT * NR)
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const d = dark[y * w + x]
+        if (!d) continue
+        const X = x - cx, Y = y - cy
+        for (let t = 0; t < NT; t++) acc[t * NR + Math.round(X * cos[t] + Y * sin[t]) + R] += d
+      }
+      const angle = (t) => (t + T0) * dT
+      // Точки прямой (θ, ρ) внутри картинки, шаг 1 пиксель.
+      function walk(theta, rho, fn) {
+        const c = Math.cos(theta), s = Math.sin(theta)
+        const px = cx + rho * c, py = cy + rho * s          // ближайшая к центру точка
+        const L = Math.hypot(w, h) / 2 + 2
+        for (let k = -L; k <= L; k++) {
+          const x = px - k * s, y = py + k * c
+          if (x < 0 || y < 0 || x > w - 1 || y > h - 1) continue
+          fn(x, y, k)
+        }
+      }
+      // Сплошность линии: доля длины, которая лежит в тёмных отрезках не короче minRun.
+      function solidity(theta, rho, minRun, gapMax = 4) {
+        let total = 0, inRuns = 0, run = 0, gap = 0
+        walk(theta, rho, (x, y) => {
+          total++
+          let on = false
+          for (let o = -2; o <= 2 && !on; o++) on = D(x + o * Math.cos(theta), y + o * Math.sin(theta)) > 0
+          if (on) { run += 1 + gap; gap = 0 }
+          else if (run && gap < gapMax) gap++
+          else { if (run >= minRun) inRuns += run; run = 0; gap = 0 }
+        })
+        if (run >= minRun) inRuns += run
+        return total ? inRuns / total : 0
+      }
+
+      // 3. Семейство линий сетки около направления t0 (индекс угла).
+      function family(tc) {
+        const SPAN = 40 // ±20°
+        // Углы не заворачиваем: за краем диапазона та же прямая записана как (θ ± 180°, −ρ).
+        const get = (k, p) => {
+          const t = tc + k
+          if (t < 0) return acc[(t + NT) * NR + (NR - 1 - p)]
+          if (t >= NT) return acc[(t - NT) * NR + (NR - 1 - p)]
+          return acc[t * NR + p]
+        }
+        // Сильные пики Хафа в семействе (2D подавление немаксимумов).
+        const peaks = []
+        for (let k = -SPAN; k <= SPAN; k++) {
+          for (let p = 2; p < NR - 2; p++) {
+            const v = get(k, p)
+            if (v <= 0) continue
+            let isMax = true
+            for (let dk = -4; dk <= 4 && isMax; dk++) for (let dp = -4; dp <= 4; dp++) {
+              if (!dk && !dp) continue
+              const kk = k + dk
+              if (kk < -SPAN || kk > SPAN) continue
+              const u = get(kk, p + dp)
+              if (u > v || (u === v && (dk < 0 || (dk === 0 && dp < 0)))) { isMax = false; break }
+            }
+            if (isMax) peaks.push({ k, p, v })
+          }
+        }
+        peaks.sort((a, b) => b.v - a.v)
+        const top = peaks.slice(0, 24)
+        if (top.length < 4) return null
+        // Перспектива: угол линии меняется плавно вдоль семейства — k ≈ a + b·ρ. Подбираем по парам
+        // сильных пиков так, чтобы на прямую легло больше всего веса.
+        let best = null
+        for (let i = 0; i < Math.min(12, top.length); i++) for (let j = i + 1; j < Math.min(12, top.length); j++) {
+          const P = top[i], Q = top[j]
+          if (Math.abs(P.p - Q.p) < 10) continue
+          const b = (Q.k - P.k) / (Q.p - P.p), a = P.k - b * P.p
+          if (Math.abs(b) * NR > 40) continue
+          let score = 0
+          for (const T of top) if (Math.abs(T.k - (a + b * T.p)) <= 2) score += T.v
+          if (!best || score > best.score) best = { a, b, score }
+        }
+        if (!best) return null
+        const pred = (p) => best.a + best.b * p
+        // Профиль вдоль семейства: для каждого ρ — лучший угол в пределах ±1° от предсказанного.
+        const prof = new Float32Array(NR), profK = new Float32Array(NR)
+        for (let p = 0; p < NR; p++) {
+          const k0 = Math.round(pred(p))
+          for (let dk = -2; dk <= 2; dk++) {
+            const kk = k0 + dk
+            if (kk < -SPAN - 4 || kk > SPAN + 4) continue
+            const v = get(kk, p)
+            if (v > prof[p]) { prof[p] = v; profK[p] = kk }
+          }
+        }
+        // Шаг сетки — по автокорреляции профиля.
+        let mean = 0
+        for (let p = 0; p < NR; p++) mean += prof[p]
+        mean /= NR
+        let step = 0
+        const ac = []
+        for (let lag = 8; lag < NR / 3; lag++) {
+          let c = 0
+          for (let p = 0; p + lag < NR; p++) c += (prof[p] - mean) * (prof[p + lag] - mean)
+          ac[lag] = c / (NR - lag)
+        }
+        // Первый заметный локальный максимум автокорреляции (а не кратный ему).
+        let maxAc = -Infinity
+        for (let lag = 8; lag < ac.length; lag++) maxAc = Math.max(maxAc, ac[lag])
+        for (let lag = 9; lag < ac.length - 1; lag++) {
+          if (ac[lag] >= ac[lag - 1] && ac[lag] >= ac[lag + 1] && ac[lag] > maxAc * 0.5) { step = lag; break }
+        }
+        if (!step) return null
+        // Уточнение до долей пикселя по параболе.
+        const y1 = ac[step - 1], y2 = ac[step], y3 = ac[step + 1]
+        const den = y1 - 2 * y2 + y3
+        if (den < 0) step += 0.5 * (y1 - y3) / den
+        // Линии: от сильнейшего пика шагаем в обе стороны, у каждой проверяем сплошность.
+        const lineAt = (rho) => {
+          let bestL = null
+          const lo = Math.round(rho - step * 0.3), hi = Math.round(rho + step * 0.3)
+          for (let p = Math.max(1, lo); p <= Math.min(NR - 2, hi); p++) {
+            if (!bestL || prof[p] > bestL.v) bestL = { p, v: prof[p] }
+          }
+          if (!bestL) return null
+          const k = profK[bestL.p]
+          return { rho: bestL.p - R, theta: angle(tc + k), k, p: bestL.p, v: bestL.v }
+        }
+        const minRun = Math.max(6, step * 0.5)
+        // Пунктирная сетка: разрывы между штрихами линии до ~0,2 клетки не рвут её.
+        const gapMax = Math.max(4, Math.round(step * 0.2))
+        // Цепочка линий от затравки: шагаем в обе стороны, на каждом шаге ищем пик рядом.
+        const chainFrom = (seedP) => {
+          const seed = lineAt(seedP)
+          seed.sol = solidity(seed.theta, seed.rho, minRun, gapMax)
+          const lines = [seed]
+          for (const dir of [1, -1]) {
+            let cur = seed, s = step
+            for (;;) {
+              const cand = lineAt(cur.p + dir * s)
+              if (!cand) break
+              const gap = Math.abs(cand.p - cur.p)
+              if (gap < s * 0.75 || gap > s * 1.25) break
+              cand.sol = solidity(cand.theta, cand.rho, minRun, gapMax)
+              if (cand.sol < 0.15) break
+              s = s * 0.6 + gap * 0.4
+              lines.push(cand)
+              cur = cand
+            }
+          }
+          return lines
+        }
+        // Затравок несколько: сильнейший пик бывает строкой текста над рисунком.
+        // Берём самую длинную цепочку.
+        let lines = null
+        for (const T of top.filter(T => Math.abs(T.k - pred(T.p)) <= 2).slice(0, 6)) {
+          if (lines && lines.some(L => Math.abs(L.p - T.p) < step * 0.3)) continue
+          const ch = chainFrom(T.p)
+          if (!lines || ch.length > lines.length) lines = ch
+        }
+        if (!lines) return null
+        lines.sort((a, b) => a.p - b.p)
+        // Толщина/темнота линии — чтобы найти ось: сумма темноты в полосе ±3 пикселя, делённая на длину.
+        for (const L of lines) {
+          let sum = 0, n = 0
+          walk(L.theta, L.rho, (x, y) => {
+            n++
+            for (let o = -3; o <= 3; o++) sum += D(x + o * Math.cos(L.theta), y + o * Math.sin(L.theta))
+          })
+          L.ink = n ? sum / n : 0
+        }
+        return { lines, step }
+      }
+
+      const V = family(-T0)          // θ = 0
+      const H = family(0)           // θ = −90°
+      if (!V || !H || V.lines.length < 3 || H.lines.length < 3) return null
+      // Крайняя «линия», через которую не идут линии сетки поперёк, — не сетка (строка текста,
+      // край листа): у настоящей линии сетки поперечные линии подходят к ней хотя бы с одной стороны.
+      // Точка пересечения двух линий.
+      const cross = (a, b) => {
+        const c1 = Math.cos(a.theta), s1 = Math.sin(a.theta), c2 = Math.cos(b.theta), s2 = Math.sin(b.theta)
+        const det = c1 * s2 - s1 * c2
+        return [cx + (a.rho * s2 - b.rho * s1) / det, cy + (c1 * b.rho - c2 * a.rho) / det]
+      }
+      const support = (L, perp, step) => {
+        let ok = 0
+        for (const P of perp) {
+          const X = cross(L, P)
+          // вдоль поперечной линии: направление (−sinθ, cosθ)
+          const ux = -Math.sin(P.theta), uy = Math.cos(P.theta)
+          let side1 = 0, side2 = 0, n = 0
+          for (let t = 3; t <= step * 0.45; t++) {
+            n++
+            let on1 = false, on2 = false
+            for (let o = -2; o <= 2; o++) {
+              const ox = Math.cos(P.theta) * o, oy = Math.sin(P.theta) * o
+              if (D(X[0] + ux * t + ox, X[1] + uy * t + oy) > 0) on1 = true
+              if (D(X[0] - ux * t + ox, X[1] - uy * t + oy) > 0) on2 = true
+            }
+            if (on1) side1++
+            if (on2) side2++
+          }
+          if (n && Math.max(side1, side2) / n > 0.6) ok++
+        }
+        return perp.length ? ok / perp.length : 0
+      }
+      for (let pass = 0; pass < 2; pass++) {
+        for (const [F, P] of [[V, H], [H, V]]) {
+          while (F.lines.length > 3 && support(F.lines[0], P.lines, P.step) < 0.5) F.lines.shift()
+          while (F.lines.length > 3 && support(F.lines[F.lines.length - 1], P.lines, P.step) < 0.5) F.lines.pop()
+        }
+      }
+      const Vl = V.lines, Hl = H.lines
+      const nV = Vl.length, nH = Hl.length
+
+      // 4. Узлы сетки. По возрастанию ρ горизонтальные линии идут снизу вверх, вертикальные — слева направо
+      // (нормаль семейства смотрит вверх и вправо).
+      const node = []
+      for (let i = 0; i < nV; i++) { node.push([]); for (let j = 0; j < nH; j++) node[i].push(cross(Vl[i], Hl[j])) }
+
+      // Доля тёмного на отрезке (полоса ±2 пикселя поперёк).
+      const coverage = (p, q) => {
+        const len = Math.hypot(q[0] - p[0], q[1] - p[1])
+        if (len < 2) return 0
+        const ux = (q[0] - p[0]) / len, uy = (q[1] - p[1]) / len
+        let on = 0, n = 0
+        for (let t = 0; t <= len; t++) {
+          n++
+          for (let o = -2; o <= 2; o++) if (D(p[0] + ux * t - uy * o, p[1] + uy * t + ux * o) > 0) { on++; break }
+        }
+        return on / n
+      }
+      const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]
+
+      // 5. Оси. Ось темнее и толще линий сетки и выходит за край сетки (стрелка).
+      // ends(i) — концы линии на крайних перпендикулярных линиях, cells — сколько между ними клеток.
+      function pickAxis(lines, ends, cells) {
+        const scored = lines.map((L, i) => {
+          const [a, b] = ends(i)
+          const f = 1 / cells
+          const ext = Math.max(coverage(lerp(a, b, -0.15 * f), lerp(a, b, -0.6 * f)), coverage(lerp(b, a, -0.15 * f), lerp(b, a, -0.6 * f)))
+          return { i, ink: L.ink, ext, score: L.ink * (0.5 + ext) }
+        })
+        const sorted = [...scored].sort((x, y) => y.score - x.score)
+        const best = sorted[0], second = sorted[1]
+        // Крайние линии — рамка сетки, осью бывают редко; ось должна заметно выделяться.
+        if (best.ext < 0.5 || best.score < second.score * 1.15) return { index: -1, scored }
+        return { index: best.i, scored }
+      }
+      const spanV = (i) => [node[i][0], node[i][nH - 1]]
+      const spanH = (j) => [node[0][j], node[nV - 1][j]]
+      const yAxis = pickAxis(Vl, spanV, nH - 1)
+      const xAxis = pickAxis(Hl, spanH, nV - 1)
+      const hasAxes = yAxis.index >= 0 && xAxis.index >= 0
+      const i0 = hasAxes ? yAxis.index : 0
+      const j0 = hasAxes ? xAxis.index : 0
+
+      // 6. Положение точки картинки в клетках: дробный номер между соседними линиями.
+      const sd = (L, P) => (P[0] - cx) * Math.cos(L.theta) + (P[1] - cy) * Math.sin(L.theta) - L.rho
+      function frac(lines, P) {
+        const d = lines.map(L => sd(L, P))
+        for (let k = 0; k + 1 < d.length; k++) {
+          if (d[k] >= 0 && d[k + 1] <= 0) return k + d[k] / (d[k] - d[k + 1])
+        }
+        // За краем сетки — продолжаем крайнюю клетку.
+        if (d[0] < 0) return d[0] / (d[0] - d[1])
+        const n = d.length
+        return (n - 1) + d[n - 1] / (d[n - 2] - d[n - 1])
+      }
+      const toIdx = (P) => [frac(Vl, P), frac(Hl, P)]
+
+      // 7. Прямые, не совпадающие с сеткой (касательная, график линейной функции).
+      const famAngle = (lines) => lines.reduce((s, L) => s + L.theta, 0) / lines.length
+      const aV = famAngle(Vl), aH = famAngle(Hl)
+      const angDiff = (a, b) => { let d = Math.abs(a - b) % Math.PI; return Math.min(d, Math.PI - d) }
+      const cell = (V.step + H.step) / 2
+      const cands = []
+      for (let t = 0; t < NT; t++) {
+        const th = angle(t)
+        if (angDiff(th, aV) < 0.05 || angDiff(th, aH) < 0.05) continue
+        for (let p = 6; p < NR - 6; p++) {
+          const v = acc[t * NR + p]
+          if (v < cell * 20) continue
+          let isMax = true
+          for (let dt = -6; dt <= 6 && isMax; dt++) for (let dp = -6; dp <= 6; dp++) {
+            const tt = t + dt
+            if ((!dt && !dp) || tt < 0 || tt >= NT) continue
+            const u = acc[tt * NR + p + dp]
+            if (u > v || (u === v && (dt < 0 || (dt === 0 && dp < 0)))) { isMax = false; break }
+          }
+          if (isMax) cands.push({ theta: th, rho: p - R, v })
+        }
+      }
+      cands.sort((a, b) => b.v - a.v)
+      const lineCands = cands.slice(0, 16)
+
+      return { V, H, Vl, Hl, node, nV, nH, i0, j0, hasAxes, lineCands, toIdx, cell, w, h, cx, cy }
+    }
+
+    // Точка снимка для точки сетки (u, v) — дробные номера линий: u слева направо, v снизу вверх.
+    // Внутри клетки — по её четырём узлам, за краем сетки — продолжение крайней клетки.
+    function gridPoint(g, u, v) {
+      const i = Math.min(g.nV - 2, Math.max(0, Math.floor(u))), j = Math.min(g.nH - 2, Math.max(0, Math.floor(v)))
+      const a = u - i, b = v - j
+      const P00 = g.node[i][j], P10 = g.node[i + 1][j], P01 = g.node[i][j + 1], P11 = g.node[i + 1][j + 1]
+      return [
+        (1 - a) * (1 - b) * P00[0] + a * (1 - b) * P10[0] + (1 - a) * b * P01[0] + a * b * P11[0],
+        (1 - a) * (1 - b) * P00[1] + a * (1 - b) * P10[1] + (1 - a) * b * P01[1] + a * b * P11[1]
+      ]
+    }
+
+    // Выпрямленный рисунок: каждая клетка — квадрат C×C, вокруг сетки поля по M клеток.
+    // sample(x, y, k) — берёт цвет снимка в точке (x, y) рабочей картинки и кладёт в пиксель k.
+    function gridRectify(g, C, M, sample) {
+      const RW = Math.round((g.nV - 1 + 2 * M) * C), RH = Math.round((g.nH - 1 + 2 * M) * C)
+      for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
+        const P = gridPoint(g, x / C - M, g.nH - 1 - (y / C - M))
+        sample(P[0], P[1], y * RW + x)
+      }
+      return { RW, RH }
+    }
+
+    // Прямые на выпрямленном рисунке: точное положение и узлы, через которые они проходят.
+    // rg — яркости выпрямленного рисунка. Ответ в координатах осей (клетках).
+    function gridMeasureLines(g, rg, RW, RH, C, M) {
+      const dark = darkMap(rg, RW, RH)
+      const Dk = (x, y) => (x < 0 || y < 0 || x >= RW || y >= RH) ? 0 : dark[y * RW + x]
+      const px = (u) => Math.round((u + M) * C), py = (v) => Math.round((g.nH - 1 - v + M) * C)
+      const found = []
+      for (const cand of g.lineCands) {
+        // Два далёких конца прямой-кандидата — в номера линий сетки.
+        const c0 = Math.cos(cand.theta), s0 = Math.sin(cand.theta), L = Math.hypot(g.w, g.h)
+        const at = (k) => [g.cx + cand.rho * c0 - k * s0, g.cy + cand.rho * s0 + k * c0]
+        const A = g.toIdx(at(-L / 4)), B = g.toIdx(at(L / 4))
+        // Пологая прямая — v как функция u, крутая — u как функция v.
+        const steep = Math.abs(B[1] - A[1]) > Math.abs(B[0] - A[0])
+        const maj = steep ? 1 : 0, mino = 1 - maj
+        let k = (B[mino] - A[mino]) / (B[maj] - A[maj]), b = A[mino] - k * A[maj]
+        const nMaj = (steep ? g.nH : g.nV) - 1, nMin = (steep ? g.nV : g.nH) - 1
+        const samples = []
+        for (let t = -M + 0.1; t <= nMaj + M - 0.1; t += 1 / C) {
+          if (Math.abs(t - Math.round(t)) * C < 3) continue // поперёк идёт линия сетки — тут не мерим
+          const pred = k * t + b
+          if (pred < -M || pred > nMin + M) continue
+          const win = Math.round(C * 0.35)
+          // Профиль темноты поперёк прямой; линии сетки вдоль неё вырезаем.
+          const prof = []
+          for (let d = -win; d <= win; d++) {
+            const m = pred + d / C
+            if (Math.abs(m - Math.round(m)) * C < 2.5) { prof.push(0); continue }
+            prof.push(steep ? Dk(px(m), py(t)) : Dk(px(t), py(m)))
+          }
+          // Ближайший к ожидаемому пик сглаженного профиля.
+          let bestD = null
+          const sm = (q) => (prof[q - 1] || 0) + prof[q] + (prof[q + 1] || 0)
+          for (let q = 1; q < prof.length - 1; q++) {
+            const v = sm(q)
+            if (v < 30 || v < sm(q - 1) || v < (q + 1 < prof.length - 1 ? sm(q + 1) : 0)) continue
+            const l = sm(q - 1), r = q + 1 < prof.length - 1 ? sm(q + 1) : 0
+            const den = l - 2 * v + r
+            const off = q - win + (den < 0 ? 0.5 * (l - r) / den : 0)
+            if (bestD === null || Math.abs(off) < Math.abs(bestD)) bestD = off
+          }
+          if (bestD !== null) samples.push([t, pred + bestD / C])
+        }
+        if (samples.length < C * 1.2) continue
+        // Устойчивая подгонка: точки, где рядом кривая или подпись, отбрасываются.
+        let inl = samples
+        for (const thr of [0.25, 0.12, 0.06, 0.04]) {
+          const n = inl.length
+          if (n < C * 2) break
+          const mt = inl.reduce((a, p) => a + p[0], 0) / n, mm = inl.reduce((a, p) => a + p[1], 0) / n
+          let stt = 0, stm = 0
+          for (const [t, m] of inl) { stt += (t - mt) ** 2; stm += (t - mt) * (m - mm) }
+          k = stm / stt; b = mm - k * mt
+          inl = samples.filter(([t, m]) => Math.abs(m - (k * t + b)) < thr)
+        }
+        // Протяжённость прямой — самый длинный участок без разрывов больше полуклетки.
+        const ts = inl.map(p => p[0]).sort((x, y) => x - y)
+        let best = null, st = 0
+        for (let q = 1; q <= ts.length; q++) {
+          if (q === ts.length || ts[q] - ts[q - 1] > 0.5) {
+            if (!best || ts[q - 1] - ts[st] > best.b - best.a) best = { a: ts[st], b: ts[q - 1], n: q - st }
+            st = q
+          }
+        }
+        if (!best) continue
+        const spanCells = (best.b - best.a) * Math.hypot(1, k)
+        // Касательная и график линейной функции тянутся через большую часть сетки;
+        // короткий почти прямой кусок кривой за прямую не считаем.
+        // Плотность: на участке почти каждый столбец пикселей (кроме линий сетки) — на прямой.
+        const density = best.n / ((best.b - best.a) * C * 0.85 + 1)
+        // Концы участка в координатах сетки. Оба в узлах — это отрезок (сторона фигуры, вектор,
+        // участок ломаной), он может быть коротким. Иначе — прямая через весь рисунок (касательная,
+        // график линейной функции): она длинная.
+        const endAt = (t) => steep ? [k * t + b, t] : [t, k * t + b]
+        // Подпись вершины («A») сразу за концом продлевает штрих. Если прямая точно проходит через
+        // узел внутри участка не дальше 0,6 клетки от конца — конец в этом узле. Наружу не тянем:
+        // там, где штрих кончился раньше узла, это обычно кривая, ушедшая в сторону.
+        const snapEnd = (t0, inward) => {
+          let best = null
+          for (let t = Math.ceil(t0 - 0.7); t <= Math.floor(t0 + 0.7); t++) {
+            const m = k * t + b
+            const d = (t - t0) * inward * Math.hypot(1, k)
+            if (Math.abs(m - Math.round(m)) < 0.06 && d >= -0.16 && d <= 0.6 && (best === null || Math.abs(t - t0) < Math.abs(best - t0))) best = t
+          }
+          return best === null ? t0 : best
+        }
+        const E1 = endAt(snapEnd(best.a, 1)), E2 = endAt(snapEnd(best.b, -1))
+        const offNode = (P) => Math.max(Math.abs(P[0] - Math.round(P[0])), Math.abs(P[1] - Math.round(P[1])))
+        const snapped = offNode(E1) < 0.12 && offNode(E2) < 0.12
+        const long = spanCells >= Math.max(6, 0.5 * Math.min(g.nV - 1, g.nH - 1))
+        if (density < 0.85 || !(long || snapped && spanCells >= 1.2)) continue
+        // Лежит на линии сетки (или это ось) — такие ищет gridMeasureOnGrid.
+        if (Math.abs(k) < 0.04 && Math.abs(b - Math.round(b)) < 0.12) continue
+        // Ось толще линий сетки и меряется со сдвигом — вдоль осей прямых не ищем.
+        if (g.hasAxes && Math.abs(k) < 0.06 && Math.abs(b - (steep ? g.i0 : g.j0)) < 0.25) continue
+        // Кусок кривой около перегиба бывает почти прямым. Отличие: за концом настоящей прямой
+        // штрих обрывается, а кривая продолжается рядом, уходя от прямой в сторону.
+        const bends = (t1, t2) => {
+          let total = 0, off = 0
+          for (let t = Math.max(t1, -M + 0.1); t <= Math.min(t2, nMaj + M - 0.1); t += 1 / C) {
+            if (Math.abs(t - Math.round(t)) * C < 3) continue
+            total++
+            if (samples.some(([st, sm]) => Math.abs(st - t) < 0.5 / C && Math.abs(sm - (k * st + b)) > 0.08)) off++
+          }
+          return total > C * 0.3 && off / total > 0.5
+        }
+        if (!snapped && (bends(best.a - 1.2, best.a - 0.2) || bends(best.b + 0.2, best.b + 1.2))) continue
+        // Кривая между вершиной и впадиной тоже бывает почти прямой. Подгоняем к штриху на участке
+        // кубическую кривую: у настоящей прямой она совпадает с прямой, у куска кривой — отходит.
+        const seg = samples.filter(([t, m]) => t >= best.a && t <= best.b && Math.abs(m - (k * t + b)) < 0.2)
+        const tc = (best.a + best.b) / 2, hs = (best.b - best.a) / 2
+        const cub = fitPoly(seg.map(([t, m]) => [(t - tc) / hs, m - (k * t + b)]), 3)
+        let bow = 0
+        for (let q = -1; q <= 1; q += 0.05) bow = Math.max(bow, Math.abs(cub[0] + cub[1] * q + cub[2] * q * q + cub[3] * q * q * q))
+        if (bow > 0.06) continue
+        // Одна и та же прямая от разных кандидатов.
+        const slope = steep ? (k === 0 ? Infinity : 1 / k) : k
+        const icpt = steep ? null : b
+        if (found.some(F => F.steep === steep && Math.abs(F.k - k) < 0.03 && Math.abs(F.b - b) < 0.15)) continue
+        // Узлы — где прямая проходит через пересечение линий сетки.
+        const nodes = []
+        for (let t = Math.ceil(best.a - 0.05); t <= Math.floor(best.b + 0.05); t++) {
+          const m = k * t + b
+          const dev = Math.abs(m - Math.round(m))
+          if (dev < 0.1) {
+            const [u, v] = steep ? [Math.round(m), t] : [t, Math.round(m)]
+            nodes.push({ x: u - g.i0, y: v - g.j0, dev })
+          }
+        }
+        const ends = snapped ? [E1, E2].map(P => ({ x: Math.round(P[0]) - g.i0, y: Math.round(P[1]) - g.j0 })) : null
+        // Оба конца на одной линии сетки — отрезок лежит на ней (или это ось); такие ищет gridMeasureOnGrid.
+        if (ends && Math.abs(k) < 0.12 && (steep ? ends[0].x === ends[1].x : ends[0].y === ends[1].y)) continue
+        found.push({ steep, k, b, slope, nodes, span: spanCells, density, ends, long })
+      }
+      return found
+    }
+
+    // Отрезки, лежащие прямо на линиях сетки (основания трапеции, горизонтальный участок x(t)):
+    // в этом месте линия сетки намного темнее и толще, чем на остальной длине. Ответ — отрезки
+    // с концами в узлах, в координатах осей.
+    function gridMeasureOnGrid(g, rg, RW, RH, C, M) {
+      const dark = darkMap(rg, RW, RH)
+      const px = (u) => Math.round((u + M) * C), py = (v) => Math.round((g.nH - 1 - v + M) * C)
+      const out = []
+      // Обычная яркость линий сетки — медиана по всем линиям семейства: отрезок бывает во всю линию.
+      const baseOf = {}
+      const scan = (vertical, idx, measureOnly) => {
+        // Вдоль линии с шагом в пиксель: сумма темноты поперёк (±4 пикселя).
+        const n = vertical ? g.nH - 1 : g.nV - 1
+        const fixed = vertical ? px(idx) : py(idx)
+        const len = Math.round(n * C)
+        const s = new Float32Array(len + 1)
+        for (let q = 0; q <= len; q++) {
+          const t = q / C
+          let sum = 0
+          for (let d = -4; d <= 4; d++) {
+            const x = vertical ? fixed + d : px(t), y = vertical ? py(t) : fixed + d
+            if (x >= 0 && y >= 0 && x < RW && y < RH) sum += dark[y * RW + x]
+          }
+          s[q] = sum
+        }
+        // Обычная яркость линии — медиана вне узлов (в узлах линии сетки пересекаются и темнее).
+        const nearNode = (q) => Math.abs(q / C - Math.round(q / C)) * C < 5
+        const base = []
+        for (let q = 0; q <= len; q++) if (!nearNode(q)) base.push(s[q])
+        base.sort((a, b) => a - b)
+        if (measureOnly) { (baseOf[vertical] = baseOf[vertical] || []).push(base[Math.floor(base.length / 2)] || 1); return }
+        const fam = [...baseOf[vertical]].sort((a, b) => a - b)
+        const B = fam[Math.floor(fam.length / 2)] || 1
+        // Участки, где линия темнее обычного в 2,5 раза; узлы внутри участка его не разрывают.
+        let start = -1, last = -1
+        const close = () => {
+          if (start < 0) return
+          const a = start / C, b = last / C
+          start = -1
+          if (b - a < 0.8) return
+          const ra = Math.round(a), rb = Math.round(b)
+          if (Math.abs(a - ra) > 0.15 || Math.abs(b - rb) > 0.15 || ra === rb) return
+          const P = (t) => vertical ? { x: idx - g.i0, y: t - g.j0 } : { x: t - g.i0, y: idx - g.j0 }
+          out.push({ ends: [P(ra), P(rb)], onGrid: true })
+        }
+        for (let q = 0; q <= len; q++) {
+          if (nearNode(q)) continue
+          if (s[q] > B * 2.5) { if (start < 0) start = q; last = q }
+          else if (start >= 0 && q - last > 6) close()
+        }
+        close()
+      }
+      for (const pass of [true, false]) {
+        for (let i = 0; i < g.nV; i++) if (!(g.hasAxes && i === g.i0)) scan(true, i, pass)
+        for (let j = 0; j < g.nH; j++) if (!(g.hasAxes && j === g.j0)) scan(false, j, pass)
+      }
+      return out
+    }
+
+    // Короткий отрезок с концами в узлах бывает кусочком кривой. У настоящего отрезка каждый конец
+    // либо сходится с другим отрезком или прямой (вершина фигуры, излом ломаной), либо свободен —
+    // рядом с ним штриха нет (кроме стрелки). У кусочка кривой штрих у конца продолжается, загибаясь.
+    function gridPruneSegments(g, rg, RW, RH, C, M, lines) {
+      const dark = darkMap(rg, RW, RH)
+      const px = (u) => (u + M) * C, py = (v) => (g.nH - 1 - v + M) * C
+      const onGrid = (t) => Math.abs(t - Math.round(t)) * C < 3
+      const inks = []
+      for (let q = 0; q < dark.length; q += 7) if (dark[q] > 0) inks.push(dark[q])
+      inks.sort((a, b) => a - b)
+      const thr = Math.max(12, (inks.length ? inks[Math.floor(inks.length * 0.97)] : 40) * 0.4)
+      const isShort = (L) => L.ends && (L.onGrid || !L.long)
+      const same = (a, b) => a.x === b.x && a.y === b.y
+      const touches = (L, P) => L.ends ? L.ends.some(E => same(E, P)) : L.nodes && L.nodes.some(n => n.dev < 0.08 && n.x === P.x && n.y === P.y)
+      const keep = lines.filter(L => !isShort(L))
+      const shorts = lines.filter(isShort)
+      for (let pass = 0; pass < 3; pass++) {
+        for (let q = shorts.length - 1; q >= 0; q--) {
+          const L = shorts[q]
+          const ok = L.ends.every((E, e) => {
+            if (keep.some(K => touches(K, E)) || shorts.some(S => S !== L && touches(S, E))) return true
+            // Свободный конец: в кольце 0,2–0,5 клетки вокруг узла нет штриха, кроме самого отрезка
+            // и стрелки на нём (конус ±40° назад вдоль отрезка).
+            const O = L.ends[1 - e]
+            const back = Math.atan2(O.y - E.y, O.x - E.x)
+            let ink = 0, total = 0
+            for (let r = 0.2; r <= 0.5; r += 1 / C) for (let a = 0; a < Math.PI * 2; a += 0.7 / (r * C)) {
+              let da = Math.abs(a - back) % (Math.PI * 2); da = Math.min(da, Math.PI * 2 - da)
+              if (da < 0.7) continue
+              const u = E.x + g.i0 + r * Math.cos(a), v = E.y + g.j0 + r * Math.sin(a)
+              if (onGrid(u) || onGrid(v)) continue
+              const x = Math.round(px(u)), y = Math.round(py(v))
+              if (x < 0 || y < 0 || x >= RW || y >= RH) continue
+              total++
+              if (dark[y * RW + x] > thr) ink++
+            }
+            return total > 0 && ink / total < 0.03
+          })
+          if (!ok) shorts.splice(q, 1)
+        }
+      }
+      return keep.concat(shorts)
+    }
+
+    // Кривые (графики функций) на выпрямленном рисунке: прослеживаем штрихи по столбцам и для каждой
+    // кривой находим узлы сетки, через которые она проходит, нули, касания оси, вершины и впадины.
+    // lines — уже найденные прямые и отрезки: их штрих не путаем с кривой. Ответ — до 4 кривых
+    // в координатах осей (клетках); кривую, которую не удалось проследить чисто, не возвращаем.
+    function gridMeasureCurves(g, rg, RW, RH, C, M, lines) {
+      const dark = darkMap(rg, RW, RH)
+      const px = (u) => (u + M) * C, py = (v) => (g.nH - 1 - v + M) * C
+      const U = (x) => x / C - M, V = (y) => g.nH - 1 - (y / C - M)
+      const onGrid = (t) => Math.abs(t - Math.round(t)) * C < 3
+      // Оси толще линий сетки — их вырезаем шире, иначе путь уходит вдоль оси.
+      const axisPad = Math.max(4, C * 0.09)
+      const onAxisU = (u) => g.hasAxes && Math.abs(u - g.i0) * C < axisPad
+      const onAxisV = (v) => g.hasAxes && Math.abs(v - g.j0) * C < axisPad
+      const straight = lines.filter(L => !L.onGrid)
+      const nearLine = (u, v) => straight.some(L => {
+        const m = L.steep ? L.k * v + L.b : L.k * u + L.b
+        return Math.abs((L.steep ? u : v) - m) * C < 4
+      })
+      // 1. Кандидаты в каждом столбце: отрезки тёмного по вертикали. Линии сетки вдоль столбца
+      // пропускаем, не разрывая отрезок: кривая пересекает их постоянно.
+      const x0 = Math.ceil(px(0)), x1 = Math.floor(px(g.nV - 1))
+      const yTop = Math.ceil(py(g.nH - 1)), yBot = Math.floor(py(0))
+      // Штрих графика толще и темнее линий сетки: порог — от самых тёмных пикселей внутри сетки,
+      // тогда размытые края линий сетки в кривую не попадают.
+      const inks = []
+      for (let y = yTop; y <= yBot; y += 2) for (let x = x0; x <= x1; x += 2) {
+        if (onGrid(U(x)) || onGrid(V(y))) continue
+        const d = dark[y * RW + x]
+        if (d > 0) inks.push(d)
+      }
+      inks.sort((a, b) => a - b)
+      const strong = inks.length ? inks[Math.floor(inks.length * 0.97)] : 40
+      const thr = Math.max(12, strong * 0.4)
+      const cols = []
+      for (let x = x0; x <= x1; x++) {
+        const u = U(x)
+        const cands = []
+        if (!onGrid(u) && !onAxisU(u)) {
+          let start = -1, last = -1, ink = 0, wy = 0
+          const close = () => { if (start >= 0) { const len = last - start + 1; if (ink > thr * 3) cands.push({ y: wy / ink, len, ink }) } start = -1; ink = 0; wy = 0 }
+          for (let y = yTop; y <= yBot; y++) {
+            const v = V(y)
+            if (onGrid(v) || onAxisV(v)) continue
+            const d = dark[y * RW + x]
+            if (d > thr && !nearLine(u, v)) {
+              if (start >= 0 && y - last > axisPad * 2 + 3) close()
+              if (start < 0) start = y
+              last = y; ink += d; wy += d * y
+            }
+          }
+          close()
+        }
+        cols.push({ x, u, cands })
+      }
+      // 2. Самый «тёмный» непрерывный путь по столбцам (динамическое программирование):
+      // выгодно идти по штриху, дорого прыгать. Пустые столбцы (линии сетки, ось) перешагиваем.
+      // Штрих кривой в соседних столбцах смыкается; через вырезанную линию допускаем разрыв,
+      // пропорциональный ширине пропуска. Подписи стоят отдельно — к ним не прыгаем.
+      const bestPath = () => {
+        let bestEnd = null
+        for (let i = 0; i < cols.length; i++) {
+          for (const c of cols[i].cands) {
+            if (c.used) continue
+            c.score = Math.min(c.ink, 1500) / 100
+            c.from = null
+            for (let j = i - 1; j >= Math.max(0, i - Math.ceil(C * 0.8)); j--) {
+              for (const p of cols[j].cands) {
+                if (p.used) continue
+                const jump = Math.max(0, Math.abs(p.y - c.y) - (p.len + c.len) / 2)
+                if (jump > 3 + 3 * (i - j - 1)) continue
+                const s = p.score + Math.min(c.ink, 1500) / 100 - jump * 10 / C - (i - j - 1) * 0.1
+                if (s > c.score) { c.score = s; c.from = p; c.fromCol = j }
+              }
+            }
+            if (!bestEnd || c.score > bestEnd.score) { bestEnd = c; bestEnd.col = i }
+          }
+        }
+        if (!bestEnd) return null
+        const path = []
+        for (let c = bestEnd, i = bestEnd.col; c; ) {
+          path.push({ i, c, u: cols[i].u, y: c.y, len: c.len })
+          const f = c.from, fi = c.fromCol
+          c = f; i = fi
+        }
+        return path.reverse()
+      }
+      const curves = []
+      for (let round = 0; round < 4; round++) {
+        const path = bestPath()
+        if (!path || path.length < C * 1.5) break
+        // Штрих этой кривой из дальнейшего поиска убираем (и то, что к нему вплотную).
+        for (const p of path) for (const c of cols[p.i].cands) if (Math.abs(c.y - p.y) <= (c.len + p.len) / 2 + 3) c.used = true
+        // Качество: кривая прослежена почти во всех столбцах своего участка (кроме вырезанных линий),
+        // иначе её закрывает прямая или подписи — лучше промолчать.
+        let usable = 0
+        for (let i = path[0].i; i <= path[path.length - 1].i; i++) if (!onGrid(cols[i].u) && !onAxisU(cols[i].u)) usable++
+        if (path.length / Math.max(1, usable) < 0.9) continue
+        const cv = analyzePath(path)
+        if (cv) curves.push(cv)
+      }
+      return curves.sort((a, b) => a.from - b.from)
+
+      // 3. v(u) — значение кривой в клетках; где штрих почти вертикален, берётся середина отрезка.
+      function analyzePath(path) {
+        const pts = path.map(p => [p.u - g.i0, V(p.y) - g.j0])
+        const from = pts[0][0], to = pts[pts.length - 1][0]
+        if (to - from < 1) return null
+        // Сглаживание по соседям в пределах 0,15 клетки.
+        const sm = pts.map(([u], k) => {
+          let s = 0, n = 0
+          for (let q = Math.max(0, k - 12); q < Math.min(pts.length, k + 13); q++) if (Math.abs(pts[q][0] - u) <= 0.15) { s += pts[q][1]; n++ }
+          return [u, s / n]
+        })
+        const val = (u) => {
+          let lo = 0, hi = sm.length - 1
+          if (u <= sm[0][0]) return sm[0][1]
+          if (u >= sm[hi][0]) return sm[hi][1]
+          while (hi - lo > 1) { const m = (lo + hi) >> 1; if (sm[m][0] <= u) lo = m; else hi = m }
+          const t = (u - sm[lo][0]) / (sm[hi][0] - sm[lo][0] || 1)
+          return sm[lo][1] + (sm[hi][1] - sm[lo][1]) * t
+        }
+        // 4. Нули со сменой знака; вершины и впадины — поворот считаем, только когда кривая ушла
+        // от вершины больше чем на 0,3 клетки, иначе дрожание штриха даёт ложные вершины.
+        const step = 0.02
+        const zeros = [], extrema = []
+        let prevV = val(from)
+        for (let u = from + step; u <= to; u += step) {
+          const v = val(u)
+          if (prevV < 0 && v >= 0 || prevV > 0 && v <= 0) zeros.push({ x: u - step * v / (v - prevV || 1), dir: prevV < 0 ? 'up' : 'down' })
+          prevV = v
+        }
+        let dir = 0, hi = { u: from, v: val(from) }, lo = { u: from, v: val(from) }
+        for (let u = from + step; u <= to; u += step) {
+          const v = val(u)
+          if (v > hi.v) hi = { u, v }
+          if (v < lo.v) lo = { u, v }
+          if (dir >= 0 && hi.v - v > 0.3) {
+            if (dir === 1) extrema.push({ x: hi.u, y: hi.v, kind: 'max' })
+            dir = -1; lo = { u, v }
+          } else if (dir <= 0 && v - lo.v > 0.3) {
+            if (dir === -1) extrema.push({ x: lo.u, y: lo.v, kind: 'min' })
+            dir = 1; hi = { u, v }
+          }
+        }
+        // Два нуля совсем рядом — это кривая коснулась оси и дрогнула на ней, а не пересекла.
+        for (let q = 0; q + 1 < zeros.length; q++) if (zeros[q + 1].x - zeros[q].x < 0.35) { zeros.splice(q, 2); q-- }
+        // 5. Узлы сетки на кривой: в целом x значение почти целое. На крутых участках надёжнее
+        // обратное — где кривая пересекает целый уровень y, x почти целый.
+        const nodes = []
+        const addNode = (x, y, dev) => { if (!nodes.some(n => n.x === x && n.y === y)) nodes.push({ x, y, dev }) }
+        for (let x = Math.ceil(from + 0.05); x <= Math.floor(to - 0.05); x++) {
+          const v = val(x), slope = Math.abs(val(x + 0.1) - val(x - 0.1)) / 0.2
+          if (slope < 3 && Math.abs(v - Math.round(v)) < 0.08) addNode(x, Math.round(v), Math.abs(v - Math.round(v)))
+        }
+        for (let u = from + step; u <= to; u += step) {
+          const a = val(u - step), b = val(u)
+          const lvl = Math.ceil(Math.min(a, b))
+          if (lvl <= Math.max(a, b) && lvl >= Math.min(a, b) && Math.abs(b - a) / step >= 1) {
+            const x = u - step + step * (lvl - a) / (b - a || 1)
+            if (Math.abs(x - Math.round(x)) < 0.08) addNode(Math.round(x), lvl, Math.abs(x - Math.round(x)))
+          }
+        }
+        nodes.sort((a, b) => a.x - b.x)
+        // У концов графика — кружки и обрывы штриха: там ни нулей, ни вершин не считаем.
+        const inside = (p) => p.x > from + 0.3 && p.x < to - 0.3
+        const Z = zeros.filter(inside), E = extrema.filter(inside)
+        // Касание оси: вершина или впадина почти на оси (ось вырезана, поэтому допуск 0,2) без смены знака рядом.
+        const touches = E.filter(e => Math.abs(e.y) < 0.2 && !Z.some(z => Math.abs(z.x - e.x) < 0.3))
+        return { from, to, zeros: Z, extrema: E, touches, nodes, val }
+      }
+    }
+
+    // Окружность прослеживается как две дуги — верхняя и нижняя с общими концами по x. Подгоняем
+    // окружность к обеим дугам; если ложится ровно — это окружность: центр, r² и узлы на ней.
+    function gridFindCircles(curves) {
+      const circles = []
+      const used = new Set()
+      for (let a = 0; a < curves.length; a++) for (let b = a + 1; b < curves.length; b++) {
+        const A = curves[a], B = curves[b]
+        if (used.has(A) || used.has(B) || Math.abs(A.from - B.from) > 0.4 || Math.abs(A.to - B.to) > 0.4) continue
+        const pts = []
+        for (const c of [A, B]) for (let x = c.from; x <= c.to; x += 0.05) pts.push([x, c.val(x)])
+        // Окружность x² + y² + Dx + Ey + F = 0 методом наименьших квадратов.
+        const S = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], r = [0, 0, 0]
+        for (const [x, y] of pts) {
+          const row = [x, y, 1], rhs = -(x * x + y * y)
+          for (let i = 0; i < 3; i++) { r[i] += row[i] * rhs; for (let j = 0; j < 3; j++) S[i][j] += row[i] * row[j] }
+        }
+        for (let i = 0; i < 3; i++) {
+          let m = i
+          for (let q = i + 1; q < 3; q++) if (Math.abs(S[q][i]) > Math.abs(S[m][i])) m = q
+          ;[S[i], S[m]] = [S[m], S[i]]; [r[i], r[m]] = [r[m], r[i]]
+          for (let q = 0; q < 3; q++) if (q !== i) { const f = S[q][i] / S[i][i]; for (let j = i; j < 3; j++) S[q][j] -= f * S[i][j]; r[q] -= f * r[i] }
+        }
+        const D = r[0] / S[0][0], E = r[1] / S[1][1], F = r[2] / S[2][2]
+        const cx = -D / 2, cy = -E / 2, R2 = cx * cx + cy * cy - F
+        if (!(R2 > 0.25)) continue
+        const R = Math.sqrt(R2)
+        const rms = Math.sqrt(pts.reduce((s, [x, y]) => s + (Math.hypot(x - cx, y - cy) - R) ** 2, 0) / pts.length)
+        if (rms > 0.06) continue
+        used.add(A); used.add(B)
+        const snap = (v) => { const h = Math.round(v * 2) / 2; return Math.abs(v - h) < 0.08 ? h : v }
+        const nodes = [...A.nodes, ...B.nodes].filter((n, i, arr) => arr.findIndex(m => m.x === n.x && m.y === n.y) === i)
+        circles.push({ cx: snap(cx), cy: snap(cy), r2: Math.abs(R2 - Math.round(R2)) < 0.2 ? Math.round(R2) : R2, r: R, nodes, arcs: [A, B] })
+      }
+      return circles
+    }
+
+    // Текст для модели: что программа измерила на рисунке. Числа — в координатах осей.
+    function figureHint(g, lines, curves, circles) {
+      const num = (x) => String(Math.round(x * 100) / 100).replace('.', ',').replace('-', '−')
+      const pt = (x, y) => `(${num(x)}; ${num(y)})`
+      let hint = g.hasAxes ? '' : ' Осей на рисунке нет — числа по краям нумеруют линии сетки от нижней левой.'
+      const segs = lines.filter(L => L.ends)
+      if (segs.length) hint += ' Отрезки на рисунке (концы точно в узлах сетки): ' + segs.slice(0, 12).map(L => pt(L.ends[0].x, L.ends[0].y) + '–' + pt(L.ends[1].x, L.ends[1].y)).join(', ') + '.'
+      for (const L of lines.filter(L => !L.ends && !L.onGrid)) {
+        const nodes = L.nodes.filter(n => n.dev < 0.08).slice(0, 4)
+        if (nodes.length < 2 && !Number.isFinite(L.slope)) continue
+        const fr = nearFraction(L.slope)
+        hint += ' Прямая на рисунке'
+        if (nodes.length) hint += ' проходит через узлы ' + nodes.map(n => pt(n.x, n.y)).join(', ')
+        if (Number.isFinite(L.slope)) hint += `${nodes.length ? ',' : ''} наклон по измерению ${num(L.slope)}${fr.err < 0.02 && fr.q > 1 ? ` = ${fr.p}/${fr.q}` : ''}`
+        hint += '.'
+      }
+      for (const c of circles || []) {
+        hint += ` Окружность на рисунке, по измерению программы: центр ≈ ${pt(c.cx, c.cy)}, радиус ≈ ${num(c.r)} (r² ≈ ${num(c.r2)})` + (c.nodes.length ? ', проходит через узлы сетки ' + c.nodes.slice(0, 8).map(q => pt(q.x, q.y)).join(', ') : '') + '.'
+      }
+      const arcs = new Set((circles || []).flatMap(c => c.arcs))
+      const useful = (curves || []).filter(c => !arcs.has(c)).filter(c => c.nodes.length || g.hasAxes && (c.zeros.length || c.extrema.length))
+      useful.forEach((c, n) => {
+        const parts = []
+        if (c.nodes.length) parts.push('проходит через узлы сетки ' + c.nodes.slice(0, 10).map(q => pt(q.x, q.y)).join(', '))
+        if (g.hasAxes && c.zeros.length) parts.push('пересекает ось x в ' + c.zeros.map(z => `x ≈ ${num(z.x)} (${z.dir === 'up' ? 'снизу вверх, с - на +' : 'сверху вниз, с + на -'})`).join(', '))
+        if (g.hasAxes && c.touches.length) parts.push('касается оси x без перехода в ' + c.touches.map(t => `x ≈ ${num(t.x)}`).join(', '))
+        const max = c.extrema.filter(e => e.kind === 'max'), min = c.extrema.filter(e => e.kind === 'min')
+        if (max.length) parts.push('вершины (локальные максимумы) ' + max.map(e => pt(e.x, e.y)).join(', '))
+        if (min.length) parts.push('впадины (локальные минимумы) ' + min.map(e => pt(e.x, e.y)).join(', '))
+        const name = useful.length > 1 ? `Кривая ${n + 1} (при x от ${num(c.from)} до ${num(c.to)})` : 'Кривая на рисунке'
+        hint += ` ${name}, по измерению программы с точностью около 0,1 клетки: ` + parts.join('; ') + '.'
+      })
+      if (useful.length) hint += ' Концы графиков бери из условия и рисунка.'
+      return hint
+    }
+
+    // Многочлен степени deg по точкам [x, y] методом наименьших квадратов: коэффициенты c0..c_deg.
+    function fitPoly(pts, deg) {
+      const n = deg + 1, A = [], r = []
+      for (let i = 0; i < n; i++) { A.push(new Array(n).fill(0)); r.push(0) }
+      for (const [x, y] of pts) {
+        const p = []
+        for (let i = 0; i < n; i++) p.push(x ** i)
+        for (let i = 0; i < n; i++) { r[i] += p[i] * y; for (let j = 0; j < n; j++) A[i][j] += p[i] * p[j] }
+      }
+      for (let i = 0; i < n; i++) {
+        let m = i
+        for (let q = i + 1; q < n; q++) if (Math.abs(A[q][i]) > Math.abs(A[m][i])) m = q
+        ;[A[i], A[m]] = [A[m], A[i]]; [r[i], r[m]] = [r[m], r[i]]
+        if (!A[i][i]) return new Array(n).fill(0)
+        for (let q = 0; q < n; q++) if (q !== i) { const f = A[q][i] / A[i][i]; for (let j = i; j < n; j++) A[q][j] -= f * A[i][j]; r[q] -= f * r[i] }
+      }
+      return r.map((v, i) => v / A[i][i])
+    }
+
+    // Ближайшая простая дробь p/q (q ≤ 10) к числу.
+    function nearFraction(x) {
+      let best = null
+      for (let q = 1; q <= 10; q++) {
+        const p = Math.round(x * q)
+        const err = Math.abs(x - p / q)
+        if (!best || err < best.err - 1e-9) best = { p, q, err }
+      }
+      return best
     }
 
     const PROMPTS = {
@@ -2050,12 +3104,12 @@
 
     // ===== Очередь заданий на часы =====
     // Задания уходят строго по очереди, с первого по последнее: части одного задания — с паузой
-    // 30 с, между заданиями — 2 минуты, после последнего очередь останавливается сама.
+    // 15 с, между заданиями — 2 минуты, после последнего очередь останавливается сама.
     // Короткие ответы без решения («135», «расположенный»), идущие подряд, уходят одним
     // сообщением списком: по одному раз в две минуты четыре ответа русского шли бы шесть минут.
     // Следующий шаг заводится только после предыдущего: если iPhone приостановил страницу,
     // после возврата части не вываливаются пачкой, а идут дальше с тем же шагом.
-    const PART_GAP_MS = 30 * 1000
+    const PART_GAP_MS = 15 * 1000
     const TASK_GAP_MS = 2 * 60 * 1000
     const SHORT_TASK_MAX = 40
     let autoSendCancel = null
@@ -2276,7 +3330,7 @@
       try {
         const images = await filesToBase64(lastFiles)
         early = startEarlyTasks(currentSubject)
-        const data = await analyzePhotos(images, early && early.onText)
+        const data = await analyzePhotos(images, early && early.onText, lastFiles)
         if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
         showPhotoAnswer(data, early)
         document.getElementById('savePhotoBtn').style.display = 'block'
@@ -2451,7 +3505,7 @@
         // и загрузка крутилась бесконечно.
         const images = await filesToBase64(files)
         early = startEarlyTasks(currentSubject)
-        const data = await analyzePhotos(images, early && early.onText)
+        const data = await analyzePhotos(images, early && early.onText, files)
         if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
         showPhotoAnswer(data, early)
         document.getElementById('savePhotoBtn').style.display = 'block'
