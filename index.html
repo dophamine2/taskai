@@ -434,6 +434,26 @@
     }
 
     #photoScreen { display: flex; flex-direction: column; align-items: center; width: 100%; }
+    #customScreen { display: none; flex-direction: column; align-items: center; width: 100%; }
+    #customScreen > .card { border-radius: var(--r-btn); }
+    .custom-title { font-size: 15px; font-weight: 600; }
+    #customTextInput { min-height: 210px; font-family: var(--font); font-size: 15px; line-height: 1.5; }
+    #customPreview { display: none; width: 100%; max-width: var(--col); }
+    #customPartsList { display: flex; }
+    #customPartBtns { margin-top: 10px; margin-bottom: 0; }
+    .custom-status { font-size: 12px; line-height: 1.5; color: var(--ink-2); }
+    .custom-status[data-state="error"] { color: var(--danger); }
+    #customStatus { width: 100%; max-width: var(--col); margin-top: 10px; }
+    #customStatus:empty, #customWarning:empty { display: none; }
+    #hideSolutionsBtn[data-state="on"] { background: var(--mint-soft); color: var(--ink); }
+    body.hide-solutions #tasksList,
+    body.hide-solutions #resultCard,
+    body.hide-solutions #taskBtnsBar,
+    body.hide-solutions #halfBtns,
+    body.hide-solutions #customPartsList { display: none !important; }
+    #hiddenSolutions { display: none; width: 100%; max-width: var(--col); margin-top: 12px; }
+    #hiddenSolutionBtns { margin-bottom: 0; }
+    #hiddenSolutionCard, #customRevealedCard { display: none; margin-top: 10px; }
   </style>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraph.css">
   <script src="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraphcore.js"></script>
@@ -448,7 +468,7 @@
     <button class="icon-btn" onclick="openSettingsForTab()" aria-label="Настройки">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
     </button>
-    <a class="brand" href="https://dophamine2.github.io/taskai/"><span class="logo">Tutor</span><span class="version">v84</span></a>
+    <a class="brand" href="https://dophamine2.github.io/taskai/"><span class="logo">Tutor</span><span class="version">v85</span></a>
     <button id="modelBtn" class="pill" data-state="flash" onclick="toggleModel()">Gemini</button>
   </header>
 
@@ -510,6 +530,14 @@
       <button class="btn btn-outline btn-fit" onclick="regenerate()">Заново</button>
     </div>
   </div>
+  <div id="hiddenSolutions">
+    <div id="hiddenSolutionBtns" class="seat-grid" role="group" aria-label="Задания"></div>
+    <div id="hiddenSolutionCard" class="task-card">
+      <div id="hiddenSolutionLabel" class="task-num"></div>
+      <div id="hiddenSolutionHeard" class="heard"></div>
+      <div id="hiddenSolutionText" class="task-text"></div>
+    </div>
+  </div>
   <div class="tasks-list" id="tasksList"></div>
 
   <div class="error-card" id="errorCard">
@@ -521,6 +549,30 @@
     </div>
     <div class="error-text" id="errorText"></div>
   </div>
+  </div>
+
+  <div id="customScreen">
+    <div class="card">
+      <label class="custom-title" for="customTextInput">Свой текст</label>
+      <textarea id="customTextInput" class="field" rows="8" placeholder="Вставь текст сюда…" spellcheck="false" oninput="onCustomTextInput()"></textarea>
+      <button class="btn btn-mint" type="button" onclick="prepareCustomText()">Разбить на части</button>
+    </div>
+    <p id="customStatus" class="custom-status" role="status" aria-live="polite"></p>
+    <div id="customPreview">
+      <div class="actions">
+        <p id="customWarning" class="custom-status" data-state="error"></p>
+        <div class="row">
+          <button id="customSendBtn" class="btn btn-mint" type="button" onclick="sendCustomParts()">Отправить все</button>
+          <button id="customStopBtn" class="btn btn-outline btn-fit" type="button" onclick="stopCustomSend()" disabled>Остановить</button>
+        </div>
+        <div id="customPartBtns" class="seat-grid" role="group" aria-label="Части текста"></div>
+      </div>
+      <div id="customRevealedCard" class="task-card">
+        <div id="customRevealedLabel" class="task-num"></div>
+        <div id="customRevealedText" class="task-text"></div>
+      </div>
+      <div id="customPartsList" class="tasks-list"></div>
+    </div>
   </div>
 
   <select class="model-select" id="modelSelect" onchange="onModelChange(this.value)" style="display:none">
@@ -549,6 +601,7 @@
             <option value="physics">Физика</option>
             <option value="history">История</option>
             <option value="russian">Русский</option>
+            <option value="custom">Свой</option>
           </select>
         </div>
         <div class="modal-row" id="micRow" style="display:none">
@@ -558,6 +611,10 @@
         <div class="modal-row">
           <span class="modal-key">Уведомления</span>
           <button id="notifBtn" class="pill-btn" data-state="off" onclick="requestNotifPermission()">Вкл</button>
+        </div>
+        <div class="modal-row">
+          <span class="modal-key">Скрыть решения</span>
+          <button id="hideSolutionsBtn" class="pill-btn" type="button" data-state="off" aria-label="Скрыть решения" aria-pressed="false" onclick="toggleHideSolutions()">Выкл</button>
         </div>
       </div>
       <div class="modal-block">
@@ -570,6 +627,7 @@
     </div>
   </div>
 
+  <script src="watch-format.js"></script>
   <script>
     // Бекэнда больше нет: страница ходит в Polza сама. Ключ поэтому лежит только
     // в localStorage этого устройства — в исходнике страницы его нет, и публичный
@@ -642,6 +700,8 @@
       if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js')
       updateNotifBtn()
       loadApiKeys()
+      loadCustomDraft()
+      loadHideSolutions()
       // Эталон чистого экрана: с него начинается любой предмет, открытый впервые.
       pristineView = captureSubjectView()
     })
@@ -663,6 +723,113 @@
       if ('Notification' in window) {
         Notification.requestPermission().then(updateNotifBtn)
       }
+    }
+
+    const HIDE_SOLUTIONS_STORAGE = 'tutorHideSolutions'
+    let hideSolutions = false
+    let solutionEntries = []
+    let revealedSolutionIndex = null
+    let revealedCustomIndex = null
+
+    function loadHideSolutions() {
+      try { hideSolutions = localStorage.getItem(HIDE_SOLUTIONS_STORAGE) === 'true' } catch {}
+      applySolutionVisibility()
+    }
+
+    function toggleHideSolutions() {
+      hideSolutions = !hideSolutions
+      revealedSolutionIndex = null
+      revealedCustomIndex = null
+      try { localStorage.setItem(HIDE_SOLUTIONS_STORAGE, String(hideSolutions)) } catch {}
+      applySolutionVisibility()
+    }
+
+    function applySolutionVisibility() {
+      document.body.classList.toggle('hide-solutions', hideSolutions)
+      const btn = document.getElementById('hideSolutionsBtn')
+      btn.textContent = hideSolutions ? 'Вкл' : 'Выкл'
+      btn.dataset.state = hideSolutions ? 'on' : 'off'
+      btn.setAttribute('aria-pressed', String(hideSolutions))
+      renderHiddenSolutions()
+      renderCustomReveal()
+    }
+
+    function setPhotoSolutions(tasks, keepSelection = false) {
+      const previous = solutionEntries
+      solutionEntries = tasks.map((task, i) => ({
+        kind: 'photo', taskIndex: i, label: taskLabel(task, i), text: taskBody(task),
+        state: keepSelection && previous[i]?.kind === 'photo' ? previous[i].state : ''
+      }))
+      if (!keepSelection) revealedSolutionIndex = null
+      renderHiddenSolutions()
+    }
+
+    function renderHiddenSolutions() {
+      const container = document.getElementById('hiddenSolutions')
+      const card = document.getElementById('hiddenSolutionCard')
+      if (!hideSolutions || !solutionEntries.length || currentSubject === 'custom') {
+        container.style.display = 'none'
+        card.style.display = 'none'
+        return
+      }
+      container.style.display = 'block'
+      const bar = document.getElementById('hiddenSolutionBtns')
+      bar.innerHTML = ''
+      const hasVoice = solutionEntries.some(entry => entry.kind === 'voice')
+      solutionEntries.forEach((entry, i) => {
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.id = `hidden-solution-btn-${i}`
+        btn.className = 'task-btn'
+        const label = hasVoice ? String(i + 1) : entry.label
+        btn.textContent = label
+        btn.setAttribute('aria-label', `Показать и отправить задание ${label}`)
+        btn.setAttribute('aria-expanded', String(i === revealedSolutionIndex))
+        btn.setAttribute('aria-controls', 'hiddenSolutionCard')
+        if (entry.state) btn.dataset.state = entry.state
+        btn.onclick = () => chooseHiddenSolution(i)
+        bar.appendChild(btn)
+      })
+      const entry = solutionEntries[revealedSolutionIndex]
+      if (revealedSolutionIndex === null || !entry) { card.style.display = 'none'; return }
+      setText('hiddenSolutionLabel', `№${hasVoice ? revealedSolutionIndex + 1 : entry.label}`)
+      setText('hiddenSolutionText', entry.text)
+      setText('hiddenSolutionHeard', entry.heard || '')
+      document.getElementById('hiddenSolutionHeard').style.display = entry.heard ? 'block' : 'none'
+      card.style.display = 'flex'
+    }
+
+    function chooseHiddenSolution(index) {
+      const entry = solutionEntries[index]
+      if (!entry || !hideSolutions) return
+      revealedSolutionIndex = revealedSolutionIndex === index ? null : index
+      renderHiddenSolutions()
+      stopHalves()
+      if (entry.kind === 'voice') sendVoiceToWatch(entry.text)
+      else autoSendAllTasks(lastTasks, entry.taskIndex)
+    }
+
+    function renderCustomReveal() {
+      const card = document.getElementById('customRevealedCard')
+      const expanded = hideSolutions && revealedCustomIndex !== null && !!customParts[revealedCustomIndex]
+      card.style.display = expanded ? 'flex' : 'none'
+      customParts.forEach((_, i) => {
+        const btn = document.getElementById(`custom-part-btn-${i}`)
+        if (!btn) return
+        btn.setAttribute('aria-expanded', String(expanded && i === revealedCustomIndex))
+        btn.setAttribute('aria-controls', 'customRevealedCard')
+      })
+      if (!expanded) return
+      setText('customRevealedLabel', `${revealedCustomIndex + 1} / ${customParts.length}`)
+      setText('customRevealedText', customParts[revealedCustomIndex])
+    }
+
+    function chooseCustomPart(index) {
+      if (hideSolutions) {
+        revealedCustomIndex = revealedCustomIndex === index ? null : index
+        renderCustomReveal()
+      }
+      sendCustomParts(index)
     }
 
     // Часы Hoco Y1 рисуют пустой квадрат вместо большинства математических знаков.
@@ -788,13 +955,14 @@
     const WATCH_MIN_GAP_MS = 4000
     const watchOutbox = []
     let watchOutboxTimer = null
+    let watchOutboxBusy = false
     let lastWatchShownAt = -Infinity
 
     // Поставить уведомление в очередь показа. owner — чьё оно: остановленная отправка убирает
     // из очереди свои ещё не показанные уведомления. false — уведомления не разрешены.
-    function showWatchNotification(title, body, owner) {
+    function showWatchNotification(title, body, owner, onResult) {
       if (!('Notification' in window) || Notification.permission !== 'granted') return false
-      watchOutbox.push({ title, body, owner })
+      watchOutbox.push({ title, body, owner, onResult })
       pumpWatchOutbox()
       return true
     }
@@ -806,16 +974,18 @@
     }
 
     function pumpWatchOutbox() {
-      if (watchOutboxTimer || !watchOutbox.length) return
+      if (watchOutboxBusy || watchOutboxTimer || !watchOutbox.length) return
       const wait = lastWatchShownAt + WATCH_MIN_GAP_MS - Date.now()
       if (wait > 0) {
         watchOutboxTimer = setTimeout(() => { watchOutboxTimer = null; pumpWatchOutbox() }, wait)
         return
       }
-      const { title, body } = watchOutbox.shift()
+      const { title, body, onResult } = watchOutbox.shift()
+      watchOutboxBusy = true
       lastWatchShownAt = Date.now()
-      displayWatchNotification(title, body)
-      pumpWatchOutbox()
+      Promise.resolve().then(() => displayWatchNotification(title, body))
+        .then(() => { if (onResult) onResult(true) }, () => { if (onResult) onResult(false) })
+        .finally(() => { watchOutboxBusy = false; pumpWatchOutbox() })
     }
 
     // Показ одного уведомления. Сначала через сервис-воркер: в приложении на экране iPhone
@@ -824,13 +994,166 @@
     // всегда: беззвучное уведомление на часах легко пропустить.
     function displayWatchNotification(title, body) {
       const options = { body, silent: false }
-      const viaConstructor = () => { try { new Notification(title, options) } catch {} }
+      const viaConstructor = () => { new Notification(title, options) }
       const sw = typeof navigator !== 'undefined' ? navigator.serviceWorker : null
-      if (!sw || typeof sw.getRegistration !== 'function') { viaConstructor(); return }
-      sw.getRegistration()
+      if (!sw || typeof sw.getRegistration !== 'function') return viaConstructor()
+      return sw.getRegistration()
         .then(reg => (reg && reg.showNotification ? reg.showNotification(title, options) : viaConstructor()))
         .catch(viaConstructor)
     }
+
+    // «Свой» преобразует вставленный текст на устройстве и использует общую очередь уведомлений.
+    const CUSTOM_DRAFT_STORAGE = 'tutorCustomDraft'
+    let customParts = []
+    let customSendToken = null
+    let customSendTimer = null
+    let customWakeLock = null
+
+    function setCustomStatus(text, error = false) {
+      const el = document.getElementById('customStatus')
+      el.textContent = text
+      el.dataset.state = error ? 'error' : ''
+    }
+
+    function loadCustomDraft() {
+      try { document.getElementById('customTextInput').value = localStorage.getItem(CUSTOM_DRAFT_STORAGE) || '' } catch {}
+    }
+
+    function onCustomTextInput() {
+      stopCustomSend()
+      customParts = []
+      revealedCustomIndex = null
+      renderCustomReveal()
+      hide('customPreview')
+      setCustomStatus('')
+      try { localStorage.setItem(CUSTOM_DRAFT_STORAGE, document.getElementById('customTextInput').value) } catch {}
+    }
+
+    function prepareCustomText() {
+      stopCustomSend()
+      revealedCustomIndex = null
+      renderCustomReveal()
+      const raw = document.getElementById('customTextInput').value
+      const formatted = formatWatchInput(raw)
+      customParts = watchChunks(formatted.text)
+      if (!customParts.length) {
+        hide('customPreview')
+        setCustomStatus(raw.trim() ? 'После преобразования не осталось текста для часов.' : 'Сначала вставь текст.', true)
+        return false
+      }
+      const list = document.getElementById('customPartsList')
+      const buttons = document.getElementById('customPartBtns')
+      list.innerHTML = ''
+      buttons.innerHTML = ''
+      customParts.forEach((part, i) => {
+        const card = document.createElement('div')
+        card.className = 'task-card'
+        const header = document.createElement('div')
+        const label = document.createElement('span')
+        label.className = 'task-num'
+        label.textContent = `${i + 1} / ${customParts.length}`
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.id = `custom-part-btn-${i}`
+        btn.className = 'task-btn'
+        btn.textContent = String(i + 1)
+        btn.setAttribute('aria-label', `Отправить начиная с части ${i + 1}`)
+        btn.onclick = () => chooseCustomPart(i)
+        header.appendChild(label)
+        buttons.appendChild(btn)
+        const body = document.createElement('div')
+        body.className = 'task-text'
+        body.textContent = part
+        card.appendChild(header)
+        card.appendChild(body)
+        list.appendChild(card)
+      })
+      setText('customWarning', formatted.unsupported.length
+        ? 'Проверь формулы: ' + formatted.unsupported.join(', ')
+        : '')
+      block('customPreview')
+      renderCustomReveal()
+      setCustomStatus('')
+      return true
+    }
+
+    async function holdCustomWakeLock(token = customSendToken) {
+      if (!token || token !== customSendToken || (customWakeLock && !customWakeLock.released)) return
+      try {
+        const lock = await navigator.wakeLock.request('screen')
+        if (token === customSendToken && (!customWakeLock || customWakeLock.released)) customWakeLock = lock
+        else lock.release()
+      } catch {}
+    }
+
+    function stopCustomSend() {
+      if (customSendTimer !== null) { clearTimeout(customSendTimer); customSendTimer = null }
+      if (customSendToken) purgeWatchOutbox(customSendToken)
+      customSendToken = null
+      if (customWakeLock) { try { customWakeLock.release() } catch {}; customWakeLock = null }
+      document.getElementById('customSendBtn').disabled = false
+      document.getElementById('customStopBtn').disabled = true
+      customParts.forEach((_, i) => {
+        const btn = document.getElementById(`custom-part-btn-${i}`)
+        if (btn && btn.dataset.state === 'sending') delete btn.dataset.state
+      })
+    }
+
+    function sendCustomParts(startIdx = 0) {
+      if (currentSubject !== 'custom') return
+      if (!customParts.length && !prepareCustomText()) return
+      stopCustomSend()
+      if (!('Notification' in window) || Notification.permission !== 'granted') {
+        setCustomStatus('Разреши уведомления в настройках, чтобы отправить текст на часы.', true)
+        return
+      }
+      setCustomStatus('')
+      stopTaskQueue()
+      stopHalves()
+      const token = {}
+      customSendToken = token
+      document.getElementById('customSendBtn').disabled = true
+      document.getElementById('customStopBtn').disabled = false
+      holdCustomWakeLock(token)
+      const parts = customParts.slice()
+      let i = Math.min(Math.max(Math.floor(Number(startIdx)) || 0, 0), parts.length - 1)
+      for (let idx = i; idx < parts.length; idx++) {
+        const btn = document.getElementById(`custom-part-btn-${idx}`)
+        if (btn) delete btn.dataset.state
+      }
+      const step = () => {
+        customSendTimer = null
+        if (customSendToken !== token) return
+        const btn = document.getElementById(`custom-part-btn-${i}`)
+        if (btn) btn.dataset.state = 'sending'
+        const queued = showWatchNotification(watchTitle('Свой', i, parts.length), parts[i], token, (ok) => {
+          if (customSendToken !== token) return
+          if (!ok) {
+            stopCustomSend()
+            if (btn) btn.dataset.state = 'error'
+            setCustomStatus('Не удалось показать уведомление. Проверь разрешение и повтори отправку.', true)
+            return
+          }
+          if (btn) btn.dataset.state = 'done'
+          i++
+          if (i < parts.length) {
+            customSendTimer = setTimeout(step, PART_GAP_MS)
+          } else {
+            stopCustomSend()
+          }
+        })
+        if (!queued) {
+          stopCustomSend()
+          if (btn) btn.dataset.state = 'error'
+          setCustomStatus('Уведомления недоступны. Проверь разрешение в настройках.', true)
+        }
+      }
+      step()
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && customSendToken) holdCustomWakeLock()
+    })
 
     // Заголовок на часах — коротко: «№2 · 1/3», «Ответ · 2/4», «Голос». Длинный обрезался бы.
     function watchTitle(name, index, total) {
@@ -1054,24 +1377,24 @@
     // onText — показ ответа по кускам. Только пока ни одна попытка не выдала текст: если поток
     // оборвался на середине, повтор идёт обычным запросом, а задания сверяются с полным ответом.
     // extra — вставки с рисунками (graphInserts), signal — отмена, когда ответ уже не нужен.
-    async function solvePhotos(images, extra, onText, signal) {
+    async function solvePhotos(images, extra, onText, signal, subject = currentSubject, model = currentModel) {
       let streamed = false
       const relay = onText && ((text) => { streamed = true; onText(text) })
       const build = (model) => ({
         model,
         ...photoParams(model),
-        ...(currentSubject === 'russian' ? { plugins: [{ id: 'web' }] } : {}),
+        ...(subject === 'russian' ? { plugins: [{ id: 'web' }] } : {}),
         messages: [{
           role: 'user',
           content: [
             ...images.map(img => ({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + img } })),
             ...extra,
-            { type: 'text', text: PROMPTS[currentSubject] + (extra.length ? ' ' + GRAPH_RULES : '') }
+            { type: 'text', text: PROMPTS[subject] + (extra.length ? ' ' + GRAPH_RULES : '') }
           ]
         }]
       })
       const cancelled = { ok: false, error: 'Отменено' }
-      let usedModel = currentModel
+      let usedModel = model
       let result = await callPolza(build(usedModel), 200000, streamed ? undefined : relay, signal)
       for (let attempt = 1; !result.ok && attempt <= (result.network ? 2 : 1); attempt++) {
         if (signal?.aborted) return cancelled
@@ -1089,7 +1412,7 @@
       // Плагин в теле запроса сам по себе ничего не доказывает: модель решает, искать ли,
       // и иногда отвечает из своих знаний, не сходив в интернет. Настоящее подтверждение —
       // счётчик реальных обращений к поиску, который Polza кладёт в usage.server_tool_use.
-      if (currentSubject === 'russian' && result.ok) {
+      if (subject === 'russian' && result.ok) {
         const hits = result.usage?.server_tool_use?.web_search_requests
         console.log('[web-поиск, русский]', hits ? `сработал, запросов: ${hits}` : 'НЕ сработал в этом ответе (модель ответила без поиска)', result.usage)
       }
@@ -1102,17 +1425,19 @@
     // рисунки — обычное решение отменяем и решаем заново с выпрямленными подписанными рисунками.
     // Opus дорогой, его зря не запускаем: сначала поиск, потом одно решение.
     async function analyzePhotos(images, onText, files) {
-      if (!files || !files.length || !GRAPH_SUBJECTS.includes(currentSubject)) return solvePhotos(images, [], onText)
+      const subject = currentSubject, model = currentModel
+      const solve = (extra, callback = onText, signal) => solvePhotos(images, extra, callback, signal, subject, model)
+      if (!files || !files.length || !GRAPH_SUBJECTS.includes(subject)) return solve([])
       const found = findGraphs(images).catch(() => [])
       const withGraphs = async () => {
         const list = await found
         if (!list.length) return []
         try { return await graphInserts(files, list) } catch { return [] }
       }
-      if (currentModel === MODEL_STRONG) return solvePhotos(images, await withGraphs(), onText)
+      if (model === MODEL_STRONG) return solve(await withGraphs())
       let held = null, open = false
       const ctrl = new AbortController()
-      const plain = solvePhotos(images, [], onText && ((text) => { if (open) onText(text); else held = text }), ctrl.signal)
+      const plain = solve([], onText && ((text) => { if (open) onText(text); else held = text }), ctrl.signal)
       const extra = await withGraphs()
       if (!extra.length) {
         open = true
@@ -1121,7 +1446,7 @@
       }
       ctrl.abort()
       console.log('[графики] рисунков с сеткой:', extra.filter(x => x.type === 'image_url').length)
-      return solvePhotos(images, extra, onText)
+      return solve(extra)
     }
 
     // Повтор после обрыва ждёт, пока приложение снова на экране и сеть есть: из свёрнутого
@@ -2163,7 +2488,7 @@
       probability: 'Реши задания по теории вероятностей из ЕГЭ, профильная математика (задания 4 и 5). Пиши обычным текстом, без markdown и LaTeX: умножение обозначай точкой ·, степень — буквой в (0,8в4), сочетания C(5,3), факториал 5!. События обозначай ТОЛЬКО буквами A, B, C, D, F: P(A), P(B), P(C). Больше НИКАКИХ буквенных обозначений не вводи — ни n, ни m, ни p, ни q, ни k, ни H1: любую величину называй словами с числом («всего исходов - 8», «благоприятных - 3», «красных шаров - 5», «вероятность попадания - 0,8»). Курс 10-11 класса, профиль: классическое определение вероятности, комбинаторика, теоремы сложения и умножения, независимые и несовместные события, противоположное событие, условная вероятность, формула полной вероятности, схема Бернулли. Ничего сверх этого. Оформляй как образцовое решение из сборника, 3-5 строк на задачу. Первая строка — «P(A) - краткое описание события словами по условию». Вторая — данные словами с числами через запятую. Третья — вычисление: подставляй числа сразу, без буквенных формул, а каждое сочетание ОБЯЗАТЕЛЬНО расписывай через факториалы, C(5,4) = 5!/(4!·1!) = 5, в схеме Бернулли особенно, за пропуск снижают баллы. Последняя строка — «Ответ: число». Это описание структуры, а не нумерация: не печатай в ответе «1)», «2)» и подобные пометки. В каждой задаче обозначения начинаются заново, первое событие всегда A. Если в задаче есть пункты а), б) — каждый пункт решай как ОТДЕЛЬНУЮ задачу со своим «Ответ:», между пунктами пустая строка; в TASKS каждый пункт считается отдельной задачей. Обыкновенную дробь ОБЯЗАТЕЛЬНО сокращай до конца, пока она не станет несократимой: 10/455 = 2/91, а не 10/455. Ответ — целое число или десятичная дробь с запятой; если деление даёт бесконечную дробь, оставь несократимую обыкновенную. Округляй только если этого требует условие. Условие не переписывай. Без оборотов «применим теорему» и «отсюда следует». Первая строка: TASKS:[кол-во]. Пустая строка между задачами. Без вступлений и без рассуждений о формате.',
       algebra: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее — без слова Задание. Если в задании есть пункты а), б), в) — каждый пункт решай как ОТДЕЛЬНУЮ задачу: своя строка номера с буквой (3а., 3б.), своё решение, свой Ответ, между пунктами пустая строка; в TASKS каждый пункт считается отдельной задачей. ВНУТРИ задачи пустых строк не делай, все строки решения идут подряд. Пустая строка ставится ТОЛЬКО между задачами. Квадрат и куб пиши знаками ² и ³, для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Производная начинается со штриха: y\' =. Последняя строка задачи — Ответ. Первая строка: TASKS:[кол-во]. Без вступлений. Бесконечность пиши знаком ∞, «не равно» — знаком ≠. В обозначениях не используй подчёркивание: не x_max, а «точка максимума x = …». Пиши коротко, как решение в тетради: только формулы, подстановка чисел и результат, каждое действие — отдельной строкой. Никаких поясняющих фраз («Найдём…», «Так как…», «Следовательно…», «Значит…», «Подставим…») и никакого пересказа условия словами. Первая строка решения — сама функция или уравнение из условия (y = …). Область определения пиши, только если она не вся числовая прямая. Обыкновенные дроби не переводи в смешанные числа: пиши 7/2, а не 3 1/2 и не «3 целых 1/2».',
       geometry: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее. Если в задании есть пункты а), б), в) — каждый пункт решай как ОТДЕЛЬНУЮ задачу: своя строка номера с буквой (3а., 3б.), своё решение, свой Ответ, между пунктами пустая строка; в TASKS каждый пункт считается отдельной задачей. ВНУТРИ задачи пустых строк не делай — Дано, Решение и Ответ идут подряд, каждое с новой строки. Пустая строка ставится ТОЛЬКО между задачами. Квадрат и куб пиши знаками ² и ³ (см², м³), для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Ответ доводи до числа с единицами измерения, десятичная дробь через запятую. Первая строка: TASKS:[кол-во]. Без вступлений. Пиши коротко, как решение в тетради: только формулы, подстановка чисел и результат, каждое действие — отдельной строкой. Никаких поясняющих фраз («Найдём…», «Так как…», «Следовательно…», «Значит…», «Подставим…») и никакого пересказа условия словами. Решение — формулы и вычисления без слов. Обыкновенные дроби не переводи в смешанные числа: пиши 7/2, а не 3 1/2 и не «3 целых 1/2». Векторы всегда помечай стрелкой сразу после имени, в решении и в ответе: MN→, k→, 3k→ + t→. Координаты вектора пиши в круглых скобках сразу после стрелки: MN→(3; -1; 5), 3k→ + t→ = (1; 0; 7). Фигурные скобки не используй, даже если они есть в условии. Точки — без стрелки: M(1; 0; 2). Длина вектора — |MN→|, скалярное произведение — k→ · t→, угол между векторами — cos(k→, t→). Длины отрезков и числа стрелку не получают.',
-      physics: 'Реши задания на фото. ТОЛЬКО краткий ответ, без решения. Никакого LaTeX и markdown. Первая строка: TASKS:[кол-во]. Каждая задача — одна строка с номером: "1. ответ". Если в задании есть пункты а), б), в) — каждый пункт отдельной строкой с буквой (3а. ответ, 3б. ответ). Между задачами пустая строка. Без вступлений, без Дано, формул, вычислений и пояснений — только результат. Решай внимательно про себя, но в ответ пиши только итог. Все величины считай в СИ, ответ давай числом с единицами измерения, десятичная дробь через запятую. Если в условии сказано, в каких единицах дать ответ (например «найти в см», «в км/ч»), дай именно в этих единицах. Квадрат и куб пиши знаками ² и ³ (м/с², м³), для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48). Умножение — ·, деление — знаком /. Бесконечность — ∞, «не равно» — ≠. Обыкновенные дроби не переводи в смешанные числа: пиши 7/2, а не 3 1/2. Если к заданию приложен рисунок или график — считывай с него данные по подписям программы и измерениям так же, как в остальных заданиях, но в ответ пиши только итоговое значение.',
+      physics: 'Реши задания на фото. Никакого LaTeX и markdown. КАЖДАЯ задача начинается со строки с её номером: 1., 2. и так далее. Если в задании есть пункты а), б), в) — каждый пункт решай как ОТДЕЛЬНУЮ задачу: своя строка номера с буквой (3а., 3б.), своё решение, свой Ответ, между пунктами пустая строка; в TASKS каждый пункт считается отдельной задачей. ВНУТРИ задачи пустых строк не делай — Дано, Найти, Решение и Ответ идут подряд, каждое с новой строки. Пустая строка ставится ТОЛЬКО между задачами. Все величины переводи в СИ. Квадрат и куб пиши знаками ² и ³ (м/с², м³), для степеней выше третьей — буквой в (xв4). Корень пиши как кр(...), подкоренное выражение ВСЕГДА в скобках; для корня степени n степень идёт сразу после кр: кр3(48) — кубический корень из 48, кр(3) — квадратный корень из трёх. Умножение — ·, деление — знаком /. Ответ доводи до числа с единицами измерения, десятичная дробь через запятую. Первая строка: TASKS:[кол-во]. Без вступлений. Если в условии сказано, в каких единицах дать ответ (например «найти в см», «в км/ч»), в строке Ответ дай именно в этих единицах. Бесконечность пиши знаком ∞, «не равно» — знаком ≠. Пиши коротко, как решение в тетради: только формулы, подстановка чисел и результат, каждое действие — отдельной строкой. Никаких поясняющих фраз («Найдём…», «Так как…», «Следовательно…», «Значит…», «Подставим…») и никакого пересказа условия словами. Дано и Найти — только обозначения с числами, Решение — формулы и вычисления без слов. Обыкновенные дроби не переводи в смешанные числа: пиши 7/2, а не 3 1/2 и не «3 целых 1/2».',
       history: 'Реши задания на фото. ТОЛЬКО краткий ответ: цифры, даты или фамилии. Формат: "1. ответ" на каждой строке. Сопоставление: только цифры слитно (пример: "5. 3142"). Никаких букв A,Б,В — только цифры. Никаких пояснений.',
       russian: 'Реши задания ЕГЭ по русскому языку с фото. Никакого markdown, никаких пояснений и рассуждений — только ответ, как его записывают в бланк ЕГЭ. Цифры пишутся слитно по возрастанию, без пробелов и запятых: 135. Ответ-слово пиши строчными буквами; если слов несколько, разделяй их пробелом. Если задание требует заменить или исключить слово, пиши то слово, которое идёт в бланк, а не исходное. Решай все задания, которые видно на фото. Ничего не додумывай и не восстанавливай по смыслу. Если часть задания физически не видна — обрезана, смазана, закрыта, — напиши для него «не разобрано» и переходи к следующему. «Не разобрано» пиши ТОЛЬКО из-за нечитаемого снимка, а не из-за сложности задания: всё, что видно, решай. Пиши обычными буквами, цифрами и знаками с клавиатуры: без надстрочных и подстрочных знаков, без стрелок и математических символов — текст должен одинаково читаться и на телефоне, и на часах. Черновик своих рассуждений не выводи никогда. Формат: "1. ответ" на каждой строке. Первая строка: TASKS:[кол-во]. Без вступлений.',
       society: 'Обществознание. ТОЛЬКО краткий ответ: цифры или слова. Формат: "1. ответ" на каждой строке. Сопоставление: только цифры слитно ("5. 3142"). Никаких букв A,Б,В. Макс 3-5 слов. Никаких пояснений.',
@@ -2831,12 +3156,16 @@
       hide('resultCard')
       hide('resultHeader')
       const list = document.getElementById('tasksList')
+      if (list.style.display === 'none') solutionEntries = []
       const card = document.createElement('div')
       card.className = 'task-card'
       // Над ответом — распознанный вопрос: в потоке карточек иначе не понять, к чему ответ.
       card.innerHTML = `<div class="heard">${heard.replace(/</g, '&lt;')}</div><div class="task-text">${answer.replace(/</g, '&lt;')}</div>`
       list.insertBefore(card, list.firstChild)
       list.style.display = 'flex'
+      solutionEntries.unshift({ kind: 'voice', text: answer, heard })
+      revealedSolutionIndex = null
+      renderHiddenSolutions()
     }
 
     // Свернули приложение посреди записи — iPhone всё равно отбирает микрофон в фоне.
@@ -3021,7 +3350,8 @@
       })
       return {
         nodes, answer: lastAnswer, voiceAnswer: lastVoiceAnswer,
-        tasks: lastTasks.slice(), nextIdx: nextTaskIdx, photoUrl: lastPhotoUrl, files: lastFiles
+        tasks: lastTasks.slice(), nextIdx: nextTaskIdx, photoUrl: lastPhotoUrl, files: lastFiles,
+        solutions: solutionEntries.map(entry => ({ ...entry }))
       }
     }
 
@@ -3040,6 +3370,10 @@
       nextTaskIdx = snap.nextIdx
       lastPhotoUrl = snap.photoUrl
       lastFiles = snap.files
+      solutionEntries = (snap.solutions || []).map(entry => ({
+        ...entry, state: entry.state === 'sending' ? '' : entry.state
+      }))
+      revealedSolutionIndex = null
       // Кнопки задач создаются кодом, а не разметкой, поэтому обработчики на них
       // не переживают восстановление html — вешаем заново.
       lastTasks.forEach((task, i) => {
@@ -3049,10 +3383,12 @@
         if (btn.dataset.state === 'sending') delete btn.dataset.state
         btn.onclick = () => autoSendAllTasks(lastTasks, i)
       })
+      renderHiddenSolutions()
     }
 
     function switchSubject(value) {
       if (value === currentSubject) return
+      stopCustomSend()
       // Очередь автоотправки принадлежала прежнему предмету: её задачи уже заменены
       // в lastTasks, и продолжение слало бы на часы чужие ответы.
       stopTaskQueue()
@@ -3063,6 +3399,11 @@
       subjectViews[currentSubject] = captureSubjectView()
       currentSubject = value
       restoreSubjectView(subjectViews[value] || pristineView)
+      document.getElementById('photoScreen').style.display = value === 'custom' ? 'none' : 'flex'
+      document.getElementById('customScreen').style.display = value === 'custom' ? 'flex' : 'none'
+      document.getElementById('modelBtn').style.display = value === 'custom' ? 'none' : ''
+      revealedCustomIndex = null
+      renderCustomReveal()
       updateVoiceBtn()
       autoModelForSubject()
     }
@@ -3100,6 +3441,7 @@
       })
       header.style.display = total > 0 ? 'block' : 'none'
       list.style.display = 'flex'
+      setPhotoSolutions(tasks, !!keepStates)
     }
 
     // ===== Очередь заданий на часы =====
@@ -3117,9 +3459,18 @@
 
     function setTaskBtnState(idx, state) {
       const btn = document.getElementById(`task-btn-${idx}`)
-      if (!btn) return
-      if (state) btn.dataset.state = state
-      else delete btn.dataset.state
+      if (btn) {
+        if (state) btn.dataset.state = state
+        else delete btn.dataset.state
+      }
+      solutionEntries.forEach((entry, i) => {
+        if (entry.kind !== 'photo' || entry.taskIndex !== idx) return
+        entry.state = state || ''
+        const hiddenBtn = document.getElementById(`hidden-solution-btn-${i}`)
+        if (!hiddenBtn) return
+        if (state) hiddenBtn.dataset.state = state
+        else delete hiddenBtn.dataset.state
+      })
     }
 
     // Пока идёт очередь, экран не гаснет: на заблокированном iPhone страница засыпает,
@@ -3187,7 +3538,7 @@
       // С выбранного номера и дальше отметки снимаются; отправленные раньше остаются.
       for (let i = 0; i < tasks.length; i++) {
         const btn = document.getElementById(`task-btn-${i}`)
-        if (btn && (i >= taskIdx || btn.dataset.state === 'sending')) delete btn.dataset.state
+        if (i >= taskIdx || btn?.dataset.state === 'sending') setTaskBtnState(i, '')
       }
       holdSendWakeLock()
       let unit = null
@@ -3305,6 +3656,7 @@
         autoSendAllTasks(lastTasks)
       } else {
         document.getElementById('tasksList').style.display = 'none'
+        setPhotoSolutions(lastTasks)
         // Одно задание: строка номера на карточке тоже лишняя. В сплошных предметах текст как есть —
         // там «1. ответ» на каждой строке и есть сам ответ.
         setText('resultText', SINGLE_BLOCK_SUBJECTS.includes(currentSubject) ? lastAnswer : taskBody(lastAnswer))
@@ -3319,8 +3671,11 @@
     let lastFiles = []
 
     async function regenerate() {
-      if (!lastFiles.length) return
+      if (currentSubject === 'custom' || !lastFiles.length) return
+      const subject = currentSubject, files = lastFiles
       stopTaskQueue()
+      stopHalves()
+      setPhotoSolutions([])
       hide('resultCard'); hide('resultHeader'); document.getElementById('resultResendBtn').style.display = 'none'
       hide('errorCard')
       document.getElementById('tasksList').style.display = 'none'
@@ -3328,29 +3683,32 @@
       show('loadingCards')
       let early = null
       try {
-        const images = await filesToBase64(lastFiles)
-        early = startEarlyTasks(currentSubject)
-        const data = await analyzePhotos(images, early && early.onText, lastFiles)
+        const images = await filesToBase64(files)
+        if (currentSubject !== subject) return
+        early = startEarlyTasks(subject)
+        const data = await analyzePhotos(images, early && early.onText, files)
+        if (currentSubject !== subject) return
         if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
         showPhotoAnswer(data, early)
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch(e) {
-        setText('errorText', e.message || 'Ошибка')
-        block('errorCard')
+        if (currentSubject === subject) {
+          setText('errorText', e.message || 'Ошибка')
+          block('errorCard')
+        }
+      } finally {
+        if (currentSubject === subject) hide('loadingCards')
+        if (early) early.live = false
       }
-      hide('loadingCards')
-      if (early) early.live = false
     }
 
     let nextTaskIdx = 0
     async function resendToWatch() {
       if (!lastAnswer) return
       const btn = document.getElementById('resultResendBtn')
-      btn.textContent = 'Отправляю...'
       btn.disabled = true
       try {
         notifyAnswer(lastAnswer)
-        btn.textContent = 'Отправлено!'
         setTimeout(() => { btn.textContent = 'Отправить'; btn.disabled = false }, 2000)
       } catch(e) {
         btn.textContent = 'Ошибка'; btn.disabled = false
@@ -3479,8 +3837,13 @@
     }
 
     async function handlePhoto(input) {
+      if (currentSubject === 'custom') return
       const files = Array.from(input.files)
       if (!files.length) return
+      const subject = currentSubject
+      stopTaskQueue()
+      stopHalves()
+      setPhotoSolutions([])
 
       lastFiles = files
       lastPhotoUrl = URL.createObjectURL(files[0])
@@ -3504,19 +3867,24 @@
         // Сжатие внутри try: если лист не прочитался, раньше ошибка улетала мимо
         // и загрузка крутилась бесконечно.
         const images = await filesToBase64(files)
-        early = startEarlyTasks(currentSubject)
+        if (currentSubject !== subject) return
+        early = startEarlyTasks(subject)
         const data = await analyzePhotos(images, early && early.onText, files)
+        if (currentSubject !== subject) return
         if (!data.ok || !data.answer) throw new Error(data.error || 'Пустой ответ')
         showPhotoAnswer(data, early)
         document.getElementById('savePhotoBtn').style.display = 'block'
       } catch (e) {
-        setText('errorText', e.message || 'Не удалось подключиться к серверу')
-        block('errorCard')
+        if (currentSubject === subject) {
+          setText('errorText', e.message || 'Не удалось подключиться к серверу')
+          block('errorCard')
+        }
+      } finally {
+        if (currentSubject === subject) hide('loadingCards')
+        // Ответ закончен или не пришёл: очередь больше не ждёт новых заданий.
+        if (early) early.live = false
+        if (wakeLock) try { wakeLock.release() } catch {}
       }
-      hide('loadingCards')
-      // Ответ закончен или не пришёл: очередь больше не ждёт новых заданий.
-      if (early) early.live = false
-      if (wakeLock) try { wakeLock.release() } catch {}
     }
   </script>
 
