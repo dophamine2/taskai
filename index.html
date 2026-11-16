@@ -445,6 +445,24 @@
     .custom-status[data-state="error"] { color: var(--danger); }
     #customStatus { width: 100%; max-width: var(--col); margin-top: 10px; }
     #customStatus:empty, #customWarning:empty { display: none; }
+
+    /* ---------- Сочинение ---------- */
+    #essayScreen { display: none; flex-direction: column; align-items: center; width: 100%; }
+    #essayScreen > .card { border-radius: var(--r-btn); }
+    #essayTopicInput { min-height: 84px; font-family: var(--font); font-size: 15px; line-height: 1.5; }
+    #essayStatus { width: 100%; max-width: var(--col); margin-top: 10px; }
+    #essayStatus:empty, #essaySource:empty { display: none; }
+    #essayResult { display: none; flex-direction: column; gap: 10px; width: 100%; max-width: var(--col); margin-top: 12px; }
+    .essay-img { display: block; width: 100%; height: auto; background: var(--surface); border-radius: var(--r-card); }
+    #essaySource { word-break: break-word; }
+    /* Три кнопки частей сочинения должны влезать в строку на телефоне: длинное
+       «Аргументация» раньше выталкивало «Вывод» за край экрана. */
+    #essayWatchRow { gap: 6px; }
+    #essayWatchRow .btn { min-width: 0; padding-left: 4px; padding-right: 4px; }
+    @media (max-width: 360px) {
+      #essayWatchRow .btn { font-size: 13px; letter-spacing: -0.5px; }
+    }
+    #essaySource a { color: var(--ink); }
     #hideSolutionsBtn[data-state="on"] { background: var(--mint-soft); color: var(--ink); }
     body.hide-solutions #tasksList,
     body.hide-solutions #resultCard,
@@ -575,6 +593,33 @@
     </div>
   </div>
 
+  <div id="essayScreen">
+    <div class="card">
+      <label class="custom-title" for="essayTopicInput">Тема сочинения</label>
+      <textarea id="essayTopicInput" class="field" rows="3" placeholder="Например: Для чего люди отправляются в путешествие?" spellcheck="false" oninput="onEssayTopicInput()"></textarea>
+      <button id="essayFindBtn" class="btn btn-mint" type="button" onclick="findEssay()">Найти сочинение</button>
+    </div>
+    <p id="essayStatus" class="custom-status" role="status" aria-live="polite"></p>
+    <div class="loading-cards" id="essayLoading" role="status" aria-label="Ищу сочинение">
+      <div class="skeleton-card"><div class="skeleton-line sk-label"></div><div class="skeleton-line sk-90"></div><div class="skeleton-line sk-70"></div><div class="skeleton-line sk-90"></div><div class="skeleton-line sk-50"></div></div>
+    </div>
+    <div id="essayResult">
+      <button class="btn btn-outline" type="button" onclick="findEssay()">Заново</button>
+      <div class="row" id="essayWatchRow">
+        <button class="btn btn-mint btn-sm" type="button" onclick="sendEssayBlock(0)">Вступление</button>
+        <button class="btn btn-mint btn-sm" type="button" onclick="sendEssayBlock(1)">Аргументация</button>
+        <button class="btn btn-mint btn-sm" type="button" onclick="sendEssayBlock(2)">Вывод</button>
+      </div>
+      <div class="row">
+        <button class="btn btn-outline btn-sm btn-fit" type="button" id="essayGapBtn" onclick="toggleEssayGap()" title="Пауза между частями сочинения">Пауза 15 мин</button>
+        <button class="btn btn-outline btn-sm btn-fit" type="button" id="essayStopBtn" onclick="stopEssayWatch()" disabled>Стоп</button>
+      </div>
+      <p id="essayWatchStatus" class="custom-status" role="status" aria-live="polite"></p>
+      <img id="essayImg" class="essay-img" alt="Сочинение с выделенными тезисом и аргументами">
+      <p id="essaySource" class="custom-status"></p>
+    </div>
+  </div>
+
   <select class="model-select" id="modelSelect" onchange="onModelChange(this.value)" style="display:none">
     <option value="anthropic/claude-opus-5">Claude Opus 5</option>
     <option value="google/gemini-3.8-flash" selected>Gemini 3.8 Flash</option>
@@ -601,6 +646,7 @@
             <option value="physics">Физика</option>
             <option value="history">История</option>
             <option value="russian">Русский</option>
+            <option value="essay">Сочинение</option>
             <option value="custom">Свой</option>
           </select>
         </div>
@@ -1160,9 +1206,10 @@
       return total > 1 ? `${name} · ${index + 1}/${total}` : name
     }
 
-    // Части одного сообщения с паузой PART_GAP_MS. offset и total — чтобы номер части в заголовке
-    // считался от всего ответа, даже когда шлём только его половину. Возвращает функцию остановки.
-    function sendPartsPaced(name, parts, offset, total, onDone) {
+    // Части одного сообщения с паузой PART_GAP_MS (у сочинения своя, длинная — gapMs).
+    // offset и total — чтобы номер части в заголовке считался от всего ответа, даже когда
+    // шлём только его половину. Возвращает функцию остановки.
+    function sendPartsPaced(name, parts, offset, total, onDone, gapMs = PART_GAP_MS) {
       const owner = {}
       let i = 0
       let timer = null
@@ -1174,7 +1221,7 @@
           if (!showWatchNotification(watchTitle(name, offset + i, total), parts[i], owner)) { stopped = true; return }
           i++
         }
-        if (i < parts.length) timer = setTimeout(step, PART_GAP_MS)
+        if (i < parts.length) timer = setTimeout(step, gapMs)
         else if (onDone) onDone()
       }
       step()
@@ -1303,7 +1350,7 @@
         if (!res.ok) return { ok: false, error: 'HTTP ' + res.status + (data?.error?.message ? ': ' + data.error.message : '') }
         const answer = data.choices?.[0]?.message?.content || ''
         if (!answer.trim()) return { ok: false, error: 'Пустой ответ. Finish: ' + (data.choices?.[0]?.finish_reason || '?') }
-        return { ok: true, answer, usage: data.usage ?? null, cost: data.cost ?? data.price ?? null }
+        return { ok: true, answer, usage: data.usage ?? null, cost: data.cost ?? data.price ?? null, annotations: data.choices?.[0]?.message?.annotations ?? null }
       } catch (e) {
         clearTimeout(timer)
         if (e.name === 'AbortError') return { ok: false, error: 'Превышено время ожидания' }
@@ -3394,13 +3441,16 @@
       stopTaskQueue()
       // Вторая половина ответа тоже принадлежала прежнему предмету.
       stopHalves()
+      // Расписание частей сочинения принадлежит экрану сочинения, а не новому предмету.
+      stopEssayWatch()
       // Заготовки ожидания принадлежат запросу, а не предмету: на другом экране им не место.
       hide('loadingCards')
       subjectViews[currentSubject] = captureSubjectView()
       currentSubject = value
       restoreSubjectView(subjectViews[value] || pristineView)
-      document.getElementById('photoScreen').style.display = value === 'custom' ? 'none' : 'flex'
+      document.getElementById('photoScreen').style.display = (value === 'custom' || value === 'essay') ? 'none' : 'flex'
       document.getElementById('customScreen').style.display = value === 'custom' ? 'flex' : 'none'
+      document.getElementById('essayScreen').style.display = value === 'essay' ? 'flex' : 'none'
       document.getElementById('modelBtn').style.display = value === 'custom' ? 'none' : ''
       revealedCustomIndex = null
       renderCustomReveal()
@@ -3886,6 +3936,754 @@
         if (wakeLock) try { wakeLock.release() } catch {}
       }
     }
+
+    // ===== Сочинение =====
+    // Вписываешь тему → модель через веб-поиск Polza находит в интернете готовое сочинение,
+    // написанное человеком, и режет его на фрагменты с ролями (вопрос темы, тезис, мостик,
+    // аргумент…). Картинку с подсветкой рисует сама страница на canvas: бэкенда у приложения
+    // нет, и Python здесь не запустить. Та же картинка из тех же данных — essay_image.py (Pillow).
+    const ESSAY_STORAGE = 'tutorEssayTopic'
+    const ESSAY_W = 720, ESSAY_PAD = 36, ESSAY_FS = 32, ESSAY_LH = 48
+    const ESSAY_FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+
+    // Роли фрагментов и цвета подсветки.
+    const ESSAY_ROLES = {
+      question:   { label: 'Вопрос темы',           color: '#CFE3FF' },
+      thesis:     { label: 'Тезис',                 color: '#5EF3A0' },
+      bridge:     { label: 'Речевой мостик',        color: '#FFD3A6' },
+      work:       { label: 'Произведение, автор',   color: '#E2D6FF' },
+      argument:   { label: 'Литературный аргумент', color: '#FFF0A0' },
+      micro:      { label: 'Микровывод',            color: '#FFC9DC' },
+      conclusion: { label: 'Заключение',            color: '#DADADA' },
+      plain:      { label: '',                      color: null }
+    }
+    // Каким блокам сочинения дал материал источник: модель пишет это в поле used_for.
+    const ESSAY_USED_FOR = {
+      intro: 'вступление', arg1: 'аргумент 1', arg2: 'аргумент 2',
+      conclusion: 'вывод', other: 'прочее'
+    }
+
+    function essayUsedForLabel(value) {
+      return String(value || '')
+        .split(/[,\s]+/)
+        .map(t => t.trim())
+        .filter(Boolean)
+        .map(t => ESSAY_USED_FOR[t.toLowerCase()] || t)
+        .join(', ')
+    }
+
+    // Речевые клише из методички «Всё про итоговое сочинение» (Умскул, А. Долгих).
+    // START — формулы начала предложения, TAIL — устойчивые обороты внутри предложения.
+    // Нашлись в тексте — рисуются жирным. Тот же список нужен модели, чтобы находить границы
+    // частей, поэтому он же вставляется в промпт (essayPrompt).
+    const ESSAY_CLICHES_START = [
+      'Я считаю, что',
+      'Для аргументации (?:своего мнения|своей позиции|своей точки зрения)',
+      'Чтобы подтвердить правильность (?:моих мыслей|моей позиции|моего мнения)',
+      'Для подтверждения (?:собственных мыслей|своей позиции|своего мнения)',
+      'В подтверждение (?:своей позиции|своего мнения|моей позиции|моих мыслей)',
+      'Так, в произведении',
+      'В произведении',
+      'Подтверждающим мою точку зрения аргументом является',
+      'Кроме того,',
+      'Другим примером, подтверждающим мою точку зрения, может стать',
+      'Второй аргумент в подтверждение моего мнения хочу привести из',
+      'На данном примере видно, что',
+      'Следовательно, можно понять, что',
+      'Этот пример показывает, что',
+      'В заключение хочу сказать, что',
+      'Таким образом, можно сказать, что',
+      'Подводя итог своим размышлениям, хочется сделать вывод о том, что',
+      'Итак,',
+      'Таким образом,'
+    ]
+    const ESSAY_CLICHES_TAIL = [
+      'обращусь к литературе',
+      'хочу привести пример(?:ы|/ы)? из литературы',
+      'приведу (?:аргумент|пример|примеры) из (?:читательского опыта|литературы)',
+      'в котором рассказывается о',
+      'раскрывается тема'
+    ]
+    const ESSAY_RE = (() => {
+      const join = list => '(?:' + list.slice().sort((a, b) => b.length - a.length).join('|') + ')'
+      return {
+        start: new RegExp(join(ESSAY_CLICHES_START), 'giu'),
+        tail: new RegExp(join(ESSAY_CLICHES_TAIL), 'giu')
+      }
+    })()
+
+    function essayPrompt(topic) {
+      return [
+        'Ты — помощник по подготовке к итоговому сочинению (ЕГЭ по русскому языку, 11 класс).',
+        '',
+        'Тема сочинения: «' + topic + '»',
+        '',
+        'ЗАДАЧА — выполни ВСЕ шаги строго по порядку.',
+        '',
+        'ГЛАВНОЕ ПРАВИЛО — БЕРЁМ ГОТОВЫЙ ТЕКСТ С САЙТОВ, А НЕ ПИШЕМ ОТ СЕБЯ',
+        'Ты не сочиняешь сочинение по памяти и не придумываешь аргументы сам. Весь материал (тезис, оба аргумента, детали сюжета, заключение) берётся из реально открытых страниц с готовыми сочинениями. Собственные знания можно использовать только чтобы проверить факты, но не как источник текста. Если страница не открылась, пустая или не по теме — открой другой сайт, а не пиши абзац «из головы». Если по теме вообще не нашлось готовых сочинений на сайтах — верни {"found": false, "reason": "почему"} и не выдумывай текст.',
+        '',
+        'ВТОРОЕ ГЛАВНОЕ ПРАВИЛО — НИ ОДНОЙ ФАКТИЧЕСКОЙ ОШИБКИ',
+        'В сочинении не должно быть ни одной фактической ошибки: неверный автор, название, имя героя, возраст, год, причина или последовательность событий, сцена, которой нет в книге, — всё это брак. Если не уверен в детали, не пиши её: лучше короче и верно, чем подробно и с ошибкой. Не склеивай события разных лет в одну фразу (если жена и дочери погибли раньше, а сын в День Победы, так и пиши раздельно) и не придумывай эпизоды «по логике».',
+        '',
+        'ШАГ 1 — СБОР МАТЕРИАЛА С НЕСКОЛЬКИХ ИСТОЧНИКОВ (ОБЯЗАТЕЛЬНО)',
+        'Сделай НЕСКОЛЬКО разных поисковых запросов и открой НЕ МЕНЕЕ ТРЁХ РАЗНЫХ сайтов с готовыми сочинениями на эту тему (или близкую формулировку из тем ФИПИ). Это жёсткое требование: одного сайта недостаточно, даже если на нём есть хорошее сочинение. Если по первому запросу нашёлся только один сайт — сделай ещё 1-2 запроса с другой формулировкой темы и найди ещё сайты. Из каждого найденного сайта запомни и выпиши отдельно:',
+        ' • тезис (главная мысль) и позицию автора;',
+        ' • аргумент 1 (первое произведение, автор, герой, конкретный поступок/эпизод, связь с тезисом);',
+        ' • аргумент 2 (второе произведение или пример, автор, герой, конкретный поступок/эпизод, связь с тезисом);',
+        ' • вступление и заключение.',
+        '',
+        'ШАГ 2 — СБОРКА ЕДИНОГО ТЕКСТА ИЗ РАЗНЫХ ИСТОЧНИКОВ (ОБЯЗАТЕЛЬНО)',
+        'Собери из найденного материала ОДНО сочинение по схеме ниже. Жёсткое правило: вступление, аргумент 1, аргумент 2 и заключение бери из РАЗНЫХ сайтов — ни один блок не копируй с того же сайта, что и предыдущий. Ни одного абзаца «из головы»: по каждому блоку сначала выпиши 2-3 предложения с сайта, а потом переработай их своими словами (Шаги 5-6). Если для блока на сайтах нет материала — открой ещё сайт, а не сочиняй сам. В работе должны быть задействованы ВСЕ сайты, которые ты открыл на Шаге 1: каждый обязан дать материал хотя бы одному блоку, иначе он не нужен. В итоговом JSON в поле "sources" перечисли РОВНО те сайты, которые реально дали текст (минимум 3), и для каждого укажи в "used_for", какой блок откуда взят. Не добавляй адрес, из которого ничего не взято, и не пропускай сайт, чей материал вошёл в сочинение.',
+        '',
+        'ШАГ 3 — ТОЧНОСТЬ ЛИТЕРАТУРНЫХ АРГУМЕНТОВ (ОБЯЗАТЕЛЬНО)',
+        'Прежде чем включать аргумент в текст, проверь по источникам, что в нём верно: автор, название произведения, имена героев, сюжетные факты и причинно-следственные связи. Нельзя путать героев и события разных произведений, приписывать поступок не тому персонажу или искажать сюжет. Отдельно проверь хронологию и даты: что случилось раньше, что позже, в каком году, сколько герою лет, кто именно погиб и когда. Нельзя писать «погибли в День Победы», если раньше погибли жена и дочери, а в День Победы — сын. Если источники расходятся в деталях — выбери версию, которая совпадает в большинстве источников, либо такую, которая точно соответствует содержанию произведения. Если не уверен в достоверности детали — не включай её, замени на более общую, но верную формулировку.',
+        '',
+        'ШАГ 4 — СТРОГОЕ СОБЛЮДЕНИЕ РЕЧЕВЫХ КЛИШЕ (ОБЯЗАТЕЛЬНО)',
+        'Для question/thesis/bridge/work/micro/conclusion используй РОВНО одну из клишированных формулировок, перечисленных в схеме ниже для этой роли (можно адаптировать род/число/падеж под контекст, но ключевая конструкция клише должна остаться дословной, без перефразирования самой формулы). Клише — это не предложение для творческой переделки, а фиксированная рамка. Переписывать и осовременивать можно только текст ВНУТРИ аргумента (сюжетные детали, рассуждение), но не сами клишированные обороты.',
+        '',
+        'ШАГ 5 — ЖИВОЙ, НЕ-ИИ СТИЛЬ (ОБЯЗАТЕЛЬНО)',
+        'Готовый текст должен звучать как сочинение живого одиннадцатиклассника, а не как нейросеть. Внутри аргументов (роль argument и свободные части) используй живые связки: «Вспомним», «Взять хотя бы», «Достаточно посмотреть на», «Мне кажется», «Вот, например». Чередуй длину предложений — одинаковые по структуре фразы подряд выдают машину. Держи конкретные детали сюжета (имена, поступки, эпизоды) — без потери фактической точности (Шаг 3).',
+        '',
+        'ШАГ 6 — ПРОВЕРКА ПО ПРИЗНАКАМ СГЕНЕРИРОВАННОГО ТЕКСТА (ОБЯЗАТЕЛЬНО)',
+        'Перед выдачей прогони собранный текст по памятке «Википедия:Признаки сгенерированности текста» (https://ru.wikipedia.org/wiki/%D0%92%D0%B8%D0%BA%D0%B8%D0%BF%D0%B5%D0%B4%D0%B8%D1%8F:%D0%9F%D1%80%D0%B8%D0%B7%D0%BD%D0%B0%D0%BA%D0%B8_%D1%81%D0%B3%D0%B5%D0%BD%D0%B5%D1%80%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%BD%D0%BE%D1%81%D1%82%D0%B8_%D1%82%D0%B5%D0%BA%D1%81%D1%82%D0%B0). Каждое найденное совпадение ПЕРЕФРАЗИРУЙ своими словами — это обязательный шаг, а не пожелание. Найди и перепиши:',
+        ' а) раздутую значимость и пафос: «играет важную/ключевую роль», «имеет огромное значение», «символизирует», «оставляет неизгладимый след», «неразрывно связан» — вместо этого назови конкретный поступок героя и то, что он доказывает;',
+        ' б) поверхностный анализ и слова-пустышки: «подчёркивает», «демонстрирует», «отражает», «свидетельствует о», «раскрывает важность» — заменить на «мы видим, как…», «автор показывает, что…», «герой поступает так, потому что…»;',
+        ' в) рекламный позитив: «богатый», «яркий», «удивительный», «вековое наследие», «в самом сердце» — убрать или заменить точной деталью;',
+        ' г) канцелярские оговорки и воду: «важно отметить», «стоит подчеркнуть», «нельзя не согласиться», «данный вопрос», «в рамках данного произведения», «в современном мире», «раскрывая данную тему» — удалить целиком;',
+        ' д) шаблонные обобщения и финалы: «таким образом, можно сделать вывод», «в заключение хочется сказать», «эта тема актуальна как никогда», «хочется надеяться, что человечество…» — переписать по-своему (клише из Шага 4 остаются дословными, меняется только текст вокруг них);',
+        ' е) «правило трёх» и одинаковые перечисления из трёх пунктов, конструкции «не просто X, а Y» подряд, нанизывание деепричастных оборотов, обтекаемые формулировки вроде «определённые изменения», «ряд проблем» — сократить и назвать вещь своим именем;',
+        ' ж) крайности «всегда», «никогда», «абсолютно все», «каждый человек» — смягчить или заменить конкретикой;',
+        ' з) разметку и оформление: никаких markdown-звёздочек, жирного шрифта, списков с заголовками, эмодзи и длинных тире (тире в тексте не должно быть ни одного) — только обычный текст сочинения;',
+        ' и) одинаковые по длине и строению предложения подряд — часть укоротить, часть перестроить.',
+        ' к) «умные» книжные слова («парадигма», «дефиниция», «априори», «экзистенциальный», «амбивалентный», «рефлексия», «катарсис», «нивелирует», «превалирует» и подобные) — запрещены: заменить обычными словами, которые скажет школьник.',
+        'Если после перефразирования фраза всё ещё звучит как из нейросети — перепиши её ещё раз. Клише из Шага 4 — единственное исключение: их форма остаётся дословной, перефразировать можно только окружающий текст. Факты, имена, названия и события при переписывании не меняй.',
+        '',
+        'ШАГ 7 — ОБЪЁМ И ЯЗЫК ШКОЛЬНИКА (ОБЯЗАТЕЛЬНО)',
+        'Объём всего сочинения: от 270 слов, цель 275-280 с запасом (внутренний счётчик часто занижает, поэтому «на глаз 270» — это мало). Меньше 270 слов — брак, такой текст не отдавай. Раскладка по блокам: вступление 40-45 слов, аргумент 1 90-100, аргумент 2 90-100, заключение 35-45. Короткое вступление не уменьшает общий объём: недостающие слова добирай конкретикой в аргументах, а не водой. Воды быть не должно: каждое предложение либо двигает мысль, либо приводит пример. Пересказ сюжета — максимум 2-3 предложения на произведение, дальше сразу связь с тезисом, а не пересказ всей книги.',
+        'Пиши как одиннадцатиклассник на экзамене, а не как научная статья. Клише из Шага 4 при этом остаются дословными, простым языком пишется всё остальное:',
+        ' • простые слова и короткие фразы: «мне кажется», «я думаю», «это видно», «герой поступает так, потому что»;',
+        ' • никакой канцелярской лексики: «является», «осуществляет», «представляет собой», «данный», «в рамках», «в аспекте», «следует отметить», «немаловажно»;',
+        ' • никаких «умных» книжных слов: «парадигма», «дефиниция», «априори», «экзистенциальный», «амбивалентный», «рефлексия», «катарсис», «нивелирует», «превалирует» — если так не скажешь в обычном разговоре, замени простым словом;',
+        ' • не объясняй прописные истины: «добро важно для общества», «эта тема волнует каждого» и подобное — вода;',
+        ' • длинное тире (—) и среднее (–) в готовом тексте не используй вообще: это самый заметный признак ИИ. Вместо них запятая, двоеточие или точка; если фраза без тире рассыпается, перестрой её;',
+        ' • не начинай каждый абзац одинаково: «Таким образом», «Следовательно», «Кроме того» подряд — тоже шаблон.',
+        '',
+        'СВЯЗЬ ТЕЗИСА И АРГУМЕНТОВ (ОБЯЗАТЕЛЬНО)',
+        'Главное: тезис после «Я считаю, что…» должен подходить под ОБА аргумента. Каждый пример обязан прямо доказывать именно эту мысль, а не соседнюю или более общую. Проверяй так: подставь тезис в конец аргумента — фраза «значит, <тезис>» должна звучать логично. Если пример доказывает другое, меняй либо тезис, либо пример, пока они не совпадут. Микровывод в конце каждого аргумента возвращает к тезису по смыслу, а не уводит в сторону. Сочинение, где тезис про одно, а аргументы про другое, не отдавай.',
+        '',
+        'СХЕМА СОЧИНЕНИЯ (методичка Умскул, А. Долгих)',
+        'Абзац 1, part = "intro" — вступление и позиция:',
+        ' • question — вопрос темы, переписанный в начале («Для чего люди отправляются в путешествие?»);',
+        ' • thesis — главный тезис ОДНОЙ короткой фразой, обычно «Я считаю, что …». После «Я считаю, что» не расписывай мысль на пол-абзаца: 1 предложение на 8-15 слов, суть темы сохранена, без пояснений и повторов. Именно этот тезис раскрывают оба аргумента, поэтому он должен под них подходить (см. блок «Связь тезиса и аргументов»);',
+        ' • bridge — речевой мостик к аргументу: «Для аргументации своего мнения обращусь к литературе», «Чтобы подтвердить правильность моих мыслей, хочу привести пример из литературы», «Для подтверждения собственных мыслей приведу пример из литературы», «В подтверждение своей позиции приведу аргумент из читательского опыта».',
+        'Вступление целиком короткое: вопрос темы + короткий тезис + мостик, всего 35-45 слов. Не объясняй во вступлении то, что и так будет в аргументах.',
+        'Абзац 2, part = "arg1" — аргумент 1 из литературы:',
+        ' • work — подача произведения: «В произведении ФИО автора «Название» рассказывается…», «Так, в произведении … раскрывается тема…», «Подтверждающим мою точку зрения аргументом является произведение …, в котором рассказывается о…»;',
+        ' • argument — сам пример из произведения: сюжет, герой, поступок и связь с тезисом;',
+        ' • micro — микровывод в конце абзаца: «На данном примере видно, что…», «Следовательно, можно понять, что…», «Этот пример показывает, что…».',
+        'Абзац 3, part = "arg2" — аргумент 2 (из литературы, фильма, жизни): те же роли work / argument / micro. Начало: «Кроме того, …», «Другим примером, подтверждающим мою точку зрения, может стать…», «Второй аргумент в подтверждение моего мнения хочу привести из…».',
+        'Абзац 4, part = "conclusion" — заключение, роль conclusion: «В заключение хочу сказать, что…», «Таким образом, можно сказать, что…», «Подводя итог своим размышлениям, хочется сделать вывод о том, что…», «Итак, …».',
+        'Если структура другая — назначь ближайшие роли; лишние абзацы помечай part = "other". Роль plain — только для текста, который никуда не подходит.',
+        '',
+        'ПОСЛЕДНЯЯ ПРОВЕРКА ПЕРЕД ВЫДАЧЕЙ (ОБЯЗАТЕЛЬНО)',
+        'Перечитай готовый текст и проверь каждый аргумент: автор и название произведения; имя героя; что именно он сделал; когда это было; не смешаны ли события разных лет, разных героев и разных произведений; нет ли сцены, которой в книге нет. Сомнительную деталь подтверди источником или удали. Если факт проверить не удалось — переформулируй общими словами, но верно. Выдавай текст только после этой проверки: ни одной фактической ошибки в ответе быть не должно.',
+        '',
+        'ФОРМАТ ОТВЕТА — только JSON, без пояснений и без markdown-обёртки:',
+        '{"found": true, "sources": [{"url": "адрес сайта 1", "title": "название страницы 1", "used_for": "intro"}, {"url": "адрес сайта 2", "title": "название страницы 2", "used_for": "arg1"}, {"url": "адрес сайта 3", "title": "название страницы 3", "used_for": "arg2, conclusion"}], "paragraphs": [{"part": "intro", "segments": [{"role": "question", "text": "…"}, {"role": "thesis", "text": "…"}, {"role": "bridge", "text": "…"}]}, {"part": "arg1", "segments": […]}, {"part": "arg2", "segments": […]}, {"part": "conclusion", "segments": […]}]}',
+        'Поле "sources" ОБЯЗАТЕЛЬНО должно содержать минимум 3 разных адреса (разные домены или разные страницы) — это те сайты, которые ты реально использовал на Шаге 1-2. У каждого адреса должен быть заполнен "used_for": без него непонятно, что из этого сайта взято, и такой источник считается незадействованным.',
+        'Если подходящее сочинение найти не удалось: {"found": false, "reason": "коротко, почему"}.'
+      ].join('\n')
+    }
+
+    // ---------- Разбор ответа модели ----------
+    function parseEssayJson(raw) {
+      const s = String(raw).trim()
+      const a = s.indexOf('{'), b = s.lastIndexOf('}')
+      if (a < 0 || b <= a) throw new Error('Модель вернула не JSON — нажми «Найти сочинение» ещё раз')
+      try { return JSON.parse(s.slice(a, b + 1)) }
+      catch { throw new Error('Ответ модели оборвался — нажми «Найти сочинение» ещё раз') }
+    }
+
+    function normalizeEssay(d) {
+      const list = Array.isArray(d && d.paragraphs) ? d.paragraphs : []
+      const paragraphs = list.map(p => {
+        let segs = Array.isArray(p && p.segments) ? p.segments : (p && p.text ? [{ role: 'plain', text: p.text }] : [])
+        segs = segs
+          .map(s => ({
+            role: s && ESSAY_ROLES[s.role] ? s.role : 'plain',
+            text: String((s && s.text) || '').replace(/\s+/g, ' ').trim()
+          }))
+          .filter(s => s.text)
+        return { part: p && p.part, segments: segs }
+      }).filter(p => p.segments.length)
+      return { ...d, paragraphs }
+    }
+
+    // Источники считаем подтверждёнными, если адрес из ответа есть среди ссылок самого поиска.
+    // Поддерживает и новый формат (массив sources), и старый (одиночные source_url/source_title) —
+    // на случай, если модель всё же вернула только один источник.
+    function pickEssaySources(data, annotations) {
+      const cited = (Array.isArray(annotations) ? annotations : [])
+        .map(a => (a && a.url_citation && a.url_citation.url) || (a && a.url))
+        .filter(Boolean)
+      const norm = u => String(u).replace(/^https?:\/\/(www\.)?/i, '').replace(/[#?].*$/, '').replace(/\/+$/, '').toLowerCase()
+
+      let list = Array.isArray(data && data.sources) ? data.sources : []
+      if (!list.length && data && data.source_url) list = [{ url: data.source_url, title: data.source_title }]
+
+      const seen = new Set()
+      const sources = []
+      for (const s of list) {
+        const url = /^https?:\/\//i.test(String((s && s.url) || '')) ? String(s.url).trim() : ''
+        if (!url) continue
+        const key = norm(url)
+        if (seen.has(key)) continue
+        seen.add(key)
+        sources.push({
+          url,
+          title: String((s && s.title) || '').trim(),
+          usedFor: String((s && s.used_for) || '').trim(),
+          verified: cited.some(u => norm(u) === key)
+        })
+      }
+      return sources
+    }
+
+    // ---------- Клише ----------
+    // Диапазоны [от, до) с клише. START считается только в начале предложения, и ни одно
+    // совпадение не должно резать слово пополам.
+    function clicheRanges(text) {
+      const found = []
+      for (const [re, atStart] of [[ESSAY_RE.start, true], [ESSAY_RE.tail, false]]) {
+        re.lastIndex = 0
+        let m
+        while ((m = re.exec(text))) {
+          const a = m.index, b = a + m[0].length
+          if (atStart && !/(?:^|[.!?…»"])\s*$/.test(text.slice(0, a))) continue
+          if (a > 0 && /\p{L}/u.test(text[a - 1])) continue
+          if (b < text.length && /\p{L}/u.test(text[b])) continue
+          found.push([a, b])
+        }
+      }
+      found.sort((x, y) => x[0] - y[0])
+      const merged = []
+      for (const r of found) {
+        const last = merged[merged.length - 1]
+        if (last && r[0] <= last[1] + 1) last[1] = Math.max(last[1], r[1])
+        else merged.push(r.slice())
+      }
+      return merged
+    }
+
+    // glue — слово вплотную к предыдущему (точка или запятая сразу после клише): пробела между ними нет.
+    function essayWords(paragraph) {
+      const words = []
+      paragraph.segments.forEach(seg => {
+        const text = seg.text
+        let pos = 0
+        const push = (a, b, bold) => {
+          const glue = a > 0 && /\S/.test(text[a] || '') && /\S/.test(text[a - 1])
+          text.slice(a, b).split(/\s+/).filter(Boolean)
+            .forEach((t, i) => words.push({ t, role: seg.role, bold, glue: i === 0 && glue }))
+        }
+        clicheRanges(text).forEach(([a, b]) => { push(pos, a, false); push(a, b, true); pos = b })
+        push(pos, text.length, false)
+      })
+      return words
+    }
+
+    // ---------- Рисование ----------
+    function essayRoundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath()
+      ctx.moveTo(x + r, y)
+      ctx.arcTo(x + w, y, x + w, y + h, r)
+      ctx.arcTo(x + w, y + h, x, y + h, r)
+      ctx.arcTo(x, y + h, x, y, r)
+      ctx.arcTo(x, y, x + w, y, r)
+      ctx.closePath()
+    }
+
+    // Перенос по словам; слишком длинное слово (ссылку) рубим по символам.
+    function essayWrap(ctx, text, maxW) {
+      const lines = []
+      let line = ''
+      for (const word of String(text).split(/\s+/).filter(Boolean)) {
+        let w = word
+        while (ctx.measureText(w).width > maxW) {
+          let n = w.length
+          while (n > 1 && ctx.measureText(w.slice(0, n)).width > maxW) n--
+          if (line) { lines.push(line); line = '' }
+          lines.push(w.slice(0, n))
+          w = w.slice(n)
+        }
+        const test = line ? line + ' ' + w : w
+        if (line && ctx.measureText(test).width > maxW) { lines.push(line); line = w } else line = test
+      }
+      if (line) lines.push(line)
+      return lines
+    }
+
+    // Слова абзаца с подсветкой: соседние слова одной роли на строке сливаются в одну плашку.
+    function essayFlow(ctx, words, x0, y, maxW, draw) {
+      const setFont = bold => { ctx.font = `${bold ? 700 : 500} ${ESSAY_FS}px ${ESSAY_FONT}` }
+      setFont(false)
+      const sp = ctx.measureText(' ').width
+      const lines = [[]]
+      let x = 0
+      for (const w of words) {
+        setFont(w.bold)
+        const width = ctx.measureText(w.t).width
+        if (w.glue && lines[lines.length - 1].length) x -= sp
+        else if (x > 0 && x + width > maxW) { lines.push([]); x = 0 }
+        lines[lines.length - 1].push({ ...w, x, width })
+        x += width + sp
+      }
+      if (draw) {
+        lines.forEach((line, li) => {
+          const top = y + li * ESSAY_LH
+          let i = 0
+          while (i < line.length) {
+            let j = i
+            while (j + 1 < line.length && line[j + 1].role === line[i].role) j++
+            const color = ESSAY_ROLES[line[i].role] && ESSAY_ROLES[line[i].role].color
+            if (color) {
+              const left = x0 + line[i].x - 6
+              const right = x0 + line[j].x + line[j].width + 6
+              ctx.fillStyle = color
+              essayRoundRect(ctx, left, top + 4, right - left, ESSAY_LH - 8, 7)
+              ctx.fill()
+            }
+            i = j + 1
+          }
+          line.forEach(w => {
+            setFont(w.bold)
+            ctx.fillStyle = '#000000'
+            ctx.fillText(w.t, x0 + w.x, top + ESSAY_LH / 2 + 1)
+          })
+        })
+      }
+      return lines.length * ESSAY_LH
+    }
+
+    // Один проход и для замера высоты (draw = false), и для рисования: раскладка одна и та же.
+    // Возвращает полную высоту картинки.
+    function paintEssay(ctx, data, draw) {
+      const W = ESSAY_W, P = ESSAY_PAD, innerW = W - P * 2
+      const font = (weight, size) => { ctx.font = `${weight} ${size}px ${ESSAY_FONT}` }
+      const text = (s, x, y, color) => { if (draw) { ctx.fillStyle = color; ctx.fillText(s, x, y) } }
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      if (draw) { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, 100000) }
+      let y = P
+
+      font(600, 18); text('ТЕМА', P, y + 10, '#7A7A7A'); y += 30
+      font(700, 38)
+      essayWrap(ctx, data.topic, innerW).forEach(line => { text(line, P, y + 24, '#000000'); y += 48 })
+      y += 22
+
+      data.paragraphs.forEach(p => {
+        y += essayFlow(ctx, essayWords(p), P, y, innerW, draw)
+        y += 30
+      })
+
+      const count = data.paragraphs.reduce((n, p) => n + essayWords(p).length, 0)
+      const srcCount = Array.isArray(data.sources) ? data.sources.length : 0
+      const src = srcCount === 1 ? ' · Источник: ' + data.sources[0].url.replace(/^https?:\/\//i, '')
+        : srcCount > 1 ? ` · Источников: ${srcCount} (см. ссылки ниже)` : ''
+      font(500, 20)
+      essayWrap(ctx, `Слов: ${count}, нужно от 270${src}`, innerW).forEach(line => { text(line, P, y + 14, '#7A7A7A'); y += 28 })
+      return y + P
+    }
+
+    // Картинка рисуется сразу в нужный размер: превью — в физические пиксели экрана (иначе браузер
+    // сжимает огромный canvas, и текст «мылится»), файл для скачивания — втрое крупнее.
+    function renderEssayImage(data, scale) {
+      const height = paintEssay(document.createElement('canvas').getContext('2d'), data, false)
+      // Предел площади canvas в Safari — около 16 млн пикселей.
+      while (scale > 1 && ESSAY_W * scale * height * scale > 14e6) scale -= 0.5
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(ESSAY_W * scale)
+      canvas.height = Math.ceil(height * scale)
+      const ctx = canvas.getContext('2d')
+      ctx.scale(canvas.width / ESSAY_W, canvas.width / ESSAY_W)
+      paintEssay(ctx, data, true)
+      return new Promise((resolve, reject) =>
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('Не удалось собрать картинку')), 'image/png'))
+    }
+
+    function essayPreviewScale() {
+      const css = Math.min(400, (window.innerWidth || 400) - 32)
+      return Math.min(3, Math.max(1, (window.devicePixelRatio || 1) * css / ESSAY_W))
+    }
+
+    // ---------- Экран ----------
+    let essayData = null
+    let essayUrl = null
+
+    function setEssayStatus(text, error = false) {
+      const el = document.getElementById('essayStatus')
+      el.textContent = text
+      if (error) el.dataset.state = 'error'
+      else delete el.dataset.state
+    }
+
+    function onEssayTopicInput() {
+      try { localStorage.setItem(ESSAY_STORAGE, document.getElementById('essayTopicInput').value) } catch {}
+    }
+
+    window.addEventListener('load', () => {
+      try { document.getElementById('essayTopicInput').value = localStorage.getItem(ESSAY_STORAGE) || '' } catch {}
+      loadEssayGap()
+    })
+
+    // Те же правила повторов, что и в разборе фото: ошибку сервера пробуем ещё раз, обрыв связи — дважды.
+    async function essayRequest(model, topic) {
+      const body = {
+        model,
+        max_tokens: 8000,
+        ...modelParams(model, model === MODEL_STRONG ? 'medium' : 'low'),
+        plugins: [{ id: 'web' }],
+        messages: [{ role: 'user', content: essayPrompt(topic) }]
+      }
+      let result = await callPolza(body, 200000)
+      for (let attempt = 1; !result.ok && attempt <= (result.network ? 2 : 1); attempt++) {
+        await new Promise(resolve => setTimeout(resolve, result.network ? attempt * 3000 - 1000 : 1000))
+        if (result.network) await pageReadyForNetwork()
+        result = await callPolza(body, 200000)
+      }
+      return result
+    }
+
+    // Слово считаем так же, как подпись «Слов: N» на картинке: по кускам текста,
+    // которые видит читатель. Модель свой объём обычно занижает, поэтому проверяем сами.
+    function essayWordCount(data) {
+      return data.paragraphs.reduce((n, p) => n + essayWords(p).length, 0)
+    }
+
+    // Добор объёма: модель часто отдаёт 250–266 слов вместо 270+. Просим её один раз
+    // довести текст до 275-280, не трогая структуру, роли, факты и источники.
+    function essayFixPrompt(topic, data, words) {
+      const short = words < 270
+      return [
+        'Ты редактируешь готовое итоговое сочинение по русскому языку (11 класс).',
+        'Тема: «' + topic + '»',
+        'Сейчас в тексте ' + words + ' слов, а нужно 275-280. ' + (short
+          ? 'Добавь 2-4 предложения с конкретными деталями: что именно сделал герой, как отреагировали другие, почему это важно для тезиса. Не добавляй воду, общие слова и новые произведения. Новые события, цитаты и героев не придумывай: разворачивай только то, что уже сказано в тексте.'
+          : 'Сократи воду и пересказ, оставь только то, что доказывает тезис.'),
+        'Верни ТОЛЬКО JSON без пояснений и без markdown-обёртки, в том же формате: {"paragraphs": [...]}.',
+        'Сохрани порядок абзацев, поля part и роли segments (question, thesis, bridge, work, argument, micro, conclusion, plain). Меняй только текст внутри segments и его длину.',
+        'Правила: факты, имена, авторы и названия не менять и новых не добавлять (не уверен в детали — не пиши её); тезис после «Я считаю, что…» остаётся коротким (8-15 слов) и должен подходить под оба аргумента; язык простой, как у школьника, без «умных» книжных слов и канцелярита; длинного тире (—) и среднего (–) быть не должно ни одного; в итоге 275-280 слов, посчитай их перед ответом.',
+        'Текст:',
+        JSON.stringify({ paragraphs: data.paragraphs })
+      ].join('\n')
+    }
+
+    async function essayFixLength(data, topic) {
+      const body = {
+        model: currentModel,
+        max_tokens: 8000,
+        ...modelParams(currentModel, currentModel === MODEL_STRONG ? 'medium' : 'low'),
+        messages: [{ role: 'user', content: essayFixPrompt(topic, data, essayWordCount(data)) }]
+      }
+      let result = await callPolza(body, 200000)
+      for (let attempt = 1; !result.ok && attempt <= (result.network ? 2 : 1); attempt++) {
+        await new Promise(resolve => setTimeout(resolve, result.network ? attempt * 3000 - 1000 : 1000))
+        if (result.network) await pageReadyForNetwork()
+        result = await callPolza(body, 200000)
+      }
+      if (!result.ok || !result.answer) return null
+      try {
+        const fixed = normalizeEssay(parseEssayJson(result.answer))
+        return fixed.paragraphs.length ? fixed : null
+      } catch { return null }
+    }
+
+    async function findEssay() {
+      const topic = document.getElementById('essayTopicInput').value.trim()
+      if (!topic) { setEssayStatus('Впиши тему сочинения.', true); return }
+      stopEssayWatch()
+      const btn = document.getElementById('essayFindBtn')
+      btn.disabled = true
+      hide('essayResult')
+      show('essayLoading')
+      setEssayStatus('Ищу сочинения на нескольких сайтах и собираю единый текст — обычно 30–90 секунд.')
+      let wakeLock = null
+      try { wakeLock = await navigator.wakeLock.request('screen') } catch {}
+      try {
+        const result = await essayRequest(currentModel, topic)
+        if (!result.ok) throw new Error(result.error || 'Пустой ответ')
+        const data = normalizeEssay(parseEssayJson(result.answer))
+        if (data.found === false) {
+          throw new Error(data.reason ? 'Не нашёл: ' + data.reason : 'Подходящее сочинение не нашлось — переформулируй тему')
+        }
+        if (!data.paragraphs.length) throw new Error('Не удалось разобрать сочинение — нажми «Найти сочинение» ещё раз')
+        data.topic = topic
+        data.sources = pickEssaySources(data, result.annotations)
+        // Модель регулярно отдаёт 250–266 слов вместо 270+. Если объём ниже нормы,
+        // один раз просим её дописать текст до 275-280, сохранив структуру и факты:
+        // иначе пользователю придётся жать «Заново» и надеяться на другой результат.
+        let words = essayWordCount(data)
+        if (words < 270) {
+          setEssayStatus(`Слов ${words}, нужно от 270. Довожу объём до нормы, это ещё 15–40 секунд.`)
+          const fixed = await essayFixLength(data, topic)
+          if (fixed) {
+            data.paragraphs = fixed.paragraphs
+            words = essayWordCount(data)
+          }
+        }
+        await showEssay(data)
+        // Проверяем то, что модель чаще всего нарушает: объём (минимум 270 слов) и полный
+        // запрет длинного тире. Считаем по тем же словам, что и подпись «Слов: N» на картинке.
+        const dashes = data.paragraphs.reduce((n, p) =>
+          n + p.segments.reduce((m, s) => m + (s.text.match(/[—–]/g) || []).length, 0), 0)
+        const hasThesis = data.paragraphs.some(p => p.segments.some(s => s.role === 'thesis'))
+        const notes = []
+        if (!hasThesis) notes.push('тезис не выделен')
+        if (words < 270) notes.push(`слов ${words}, нужно от 270`)
+        if (dashes) notes.push(`тире в тексте: ${dashes}`)
+        setEssayStatus(notes.length ? `Проверь: ${notes.join(', ')}. Нажми «Заново».` : '', notes.length > 0)
+      } catch (e) {
+        setEssayStatus(e.message || 'Ошибка', true)
+      } finally {
+        hide('essayLoading')
+        btn.disabled = false
+        if (wakeLock) try { wakeLock.release() } catch {}
+      }
+    }
+
+    async function showEssay(data) {
+      try { await document.fonts.ready } catch {}
+      const blob = await renderEssayImage(data, essayPreviewScale())
+      if (essayUrl) URL.revokeObjectURL(essayUrl)
+      essayData = data
+      essayUrl = URL.createObjectURL(blob)
+      document.getElementById('essayImg').src = essayUrl
+      const box = document.getElementById('essaySource')
+      box.textContent = ''
+      const sources = Array.isArray(data.sources) ? data.sources : []
+      sources.forEach((s, i) => {
+        if (i > 0) box.appendChild(document.createElement('br'))
+        // В скобках видно, какому блоку дал материал сайт: сразу понятно, задействованы ли все.
+        const used = essayUsedForLabel(s.usedFor)
+        box.append((s.verified ? 'Источник' : 'Источник (проверь ссылку)') + (used ? ` (${used})` : '') + ': ')
+        const a = document.createElement('a')
+        a.href = s.url
+        a.target = '_blank'
+        a.rel = 'noopener noreferrer'
+        a.textContent = s.title || s.url
+        box.append(a)
+      })
+      document.getElementById('essayResult').style.display = 'flex'
+    }
+
+    // ===== Части сочинения на часы =====
+    // Вступление уходит по ролям: отдельно вопрос темы, отдельно кусочек «Я считаю, что…»,
+    // отдельно клише-мостик к литературе. Аргументация и вывод идут целиком, но порезанные
+    // на короткие части — часы обрезают длинные уведомления. Внутри блока пауза PART_GAP_MS,
+    // между блоками — 15 или 20 минут: как половины ответа в сплошных предметах, только
+    // под сочинение. Так на уроке части приходят по порядку сочинения, а не пачкой.
+    const ESSAY_GAP_STORAGE = 'tutorEssayGapMin'
+    const ESSAY_GAPS = [15, 20]
+    // Внутри блока части идут редко: на итоговом сочинении между вступлением и аргументами
+    // проходит 10–15 минут, и части не должны вываливаться очередью по 15 секунд, как
+    // решения задач. 2,5 минуты — середина просимых 2–3 минут.
+    const ESSAY_PART_GAP_MS = 150 * 1000
+    let essayGapMin = 15
+    let essayWatch = null
+    let essayWatchOwner = null
+    let essayWatchTimer = null
+    let essayWatchTick = null
+    let essayWatchWake = null
+    let essayBlockStop = null
+    let essayNextAt = 0
+    let essayNextFire = null
+    let essayNextName = ''
+
+    function essayPartsWord(n) {
+      const d = n % 10, h = n % 100
+      if (d === 1 && h !== 11) return 'часть'
+      if (d >= 2 && d <= 4 && (h < 12 || h > 14)) return 'части'
+      return 'частей'
+    }
+
+    function loadEssayGap() {
+      try {
+        const n = Number(localStorage.getItem(ESSAY_GAP_STORAGE))
+        if (ESSAY_GAPS.includes(n)) essayGapMin = n
+      } catch {}
+      updateEssayGapBtn()
+    }
+
+    function updateEssayGapBtn() {
+      const btn = document.getElementById('essayGapBtn')
+      if (btn) btn.textContent = `Пауза ${essayGapMin} мин`
+    }
+
+    // 15 ↔ 20 минут. Если следующая часть уже ждёт, отсчёт начинается заново от нажатия:
+    // иначе кнопка меняла бы подпись, а таймер продолжал идти по старой паузе.
+    function toggleEssayGap() {
+      essayGapMin = essayGapMin === 15 ? 20 : 15
+      try { localStorage.setItem(ESSAY_GAP_STORAGE, String(essayGapMin)) } catch {}
+      updateEssayGapBtn()
+      if (essayNextFire) armEssayTimer()
+    }
+
+    function setEssayWatchStatus(text, error = false) {
+      const el = document.getElementById('essayWatchStatus')
+      if (!el) return
+      el.textContent = text
+      if (error) el.dataset.state = 'error'
+      else delete el.dataset.state
+    }
+
+    // Блоки сочинения в том порядке, в каком они идут в тексте. Если модель не разметила
+    // part, делим по месту: первый абзац — вступление, последний — вывод, середина — аргументы.
+    function essayBlockList() {
+      const data = essayData
+      if (!data || !Array.isArray(data.paragraphs) || !data.paragraphs.length) return []
+      const all = data.paragraphs
+      const pick = key => all.filter(p => p.part === key)
+      const textOf = list => list.map(p => p.segments.map(s => s.text).join(' ')).join('\n\n')
+      const intro = pick('intro').length ? pick('intro') : all.slice(0, 1)
+      const conclusion = pick('conclusion').length ? pick('conclusion') : all.slice(-1)
+      let args = all.filter(p => p.part === 'arg1' || p.part === 'arg2')
+      if (!args.length) args = all.filter(p => !intro.includes(p) && !conclusion.includes(p))
+      // Вступление режем по ролям, а не по 150 символов: каждая роль — отдельное уведомление.
+      const introParts = []
+      intro.forEach(p => p.segments.forEach(s => introParts.push(...watchChunks(s.text))))
+      return [
+        { name: 'Вступление', parts: introParts },
+        { name: 'Аргументация', parts: watchChunks(textOf(args)) },
+        { name: 'Вывод', parts: watchChunks(textOf(conclusion)) }
+      ].filter(b => b.parts.length)
+    }
+
+    function essayOffset(blocks, index) {
+      let n = 0
+      for (let i = 0; i < index; i++) n += blocks[i].parts.length
+      return n
+    }
+
+    async function holdEssayWatchLock() {
+      if (essayWatchWake || !essayWatch || !navigator.wakeLock) return
+      try {
+        const lock = await navigator.wakeLock.request('screen')
+        if (essayWatch && !essayWatchWake) essayWatchWake = lock
+        else lock.release()
+      } catch {}
+    }
+
+    function stopEssayWatch(message = '') {
+      if (essayWatchTimer !== null) { clearTimeout(essayWatchTimer); essayWatchTimer = null }
+      if (essayWatchTick) { clearInterval(essayWatchTick); essayWatchTick = null }
+      if (essayBlockStop) { essayBlockStop(); essayBlockStop = null }
+      if (essayWatchOwner) { purgeWatchOutbox(essayWatchOwner); essayWatchOwner = null }
+      if (essayWatchWake) { try { essayWatchWake.release() } catch {}; essayWatchWake = null }
+      essayWatch = null
+      essayNextAt = 0
+      essayNextFire = null
+      essayNextName = ''
+      const stop = document.getElementById('essayStopBtn')
+      if (stop) stop.disabled = true
+      setEssayWatchStatus(message)
+    }
+
+    function finishEssayWatch() {
+      const sent = essayWatch ? essayWatch.blocks.map(b => b.name.toLowerCase()).join(', ') : ''
+      if (essayWatchTimer !== null) { clearTimeout(essayWatchTimer); essayWatchTimer = null }
+      if (essayWatchTick) { clearInterval(essayWatchTick); essayWatchTick = null }
+      if (essayBlockStop) { essayBlockStop(); essayBlockStop = null }
+      if (essayWatchWake) { try { essayWatchWake.release() } catch {}; essayWatchWake = null }
+      // Очередь показа не чистим: последняя часть может ещё ждать своих четырёх секунд.
+      essayWatch = null
+      essayWatchOwner = null
+      essayNextAt = 0
+      essayNextFire = null
+      essayNextName = ''
+      const stop = document.getElementById('essayStopBtn')
+      if (stop) stop.disabled = true
+      setEssayWatchStatus(sent ? `Всё отправлено: ${sent}.` : 'Всё отправлено на часы.')
+    }
+
+    function essayPlay(index) {
+      if (!essayWatch || !essayWatchOwner) return
+      const blocks = essayWatch.blocks
+      const block = blocks[index]
+      if (!block) { finishEssayWatch(); return }
+      const total = blocks.reduce((n, b) => n + b.parts.length, 0)
+      setEssayWatchStatus(`${block.name}: ${block.parts.length} ${essayPartsWord(block.parts.length)}, между частями 2–3 мин.`)
+      essayBlockStop = sendPartsPaced(block.name, block.parts, essayOffset(blocks, index), total, () => {
+        essayBlockStop = null
+        if (!essayWatch) return
+        const next = index + 1
+        if (next >= blocks.length) { finishEssayWatch(); return }
+        essayNextName = blocks[next].name
+        essayNextFire = () => essayPlay(next)
+        armEssayTimer()
+      }, ESSAY_PART_GAP_MS)
+    }
+
+    function armEssayTimer() {
+      if (essayWatchTimer !== null) { clearTimeout(essayWatchTimer); essayWatchTimer = null }
+      if (essayWatchTick) { clearInterval(essayWatchTick); essayWatchTick = null }
+      essayNextAt = Date.now() + essayGapMin * 60 * 1000
+      essayWatchTimer = setTimeout(runEssayNext, essayNextAt - Date.now())
+      essayWatchTick = setInterval(updateEssayCountdown, 1000)
+      updateEssayCountdown()
+    }
+
+    function runEssayNext() {
+      essayWatchTimer = null
+      if (essayWatchTick) { clearInterval(essayWatchTick); essayWatchTick = null }
+      essayNextAt = 0
+      if (!essayWatch) return
+      holdEssayWatchLock()
+      const fire = essayNextFire
+      essayNextFire = null
+      if (fire) fire()
+    }
+
+    function updateEssayCountdown() {
+      if (!essayWatch || !essayNextAt) return
+      const left = Math.max(0, essayNextAt - Date.now())
+      const m = Math.floor(left / 60000)
+      const s = Math.floor((left % 60000) / 1000)
+      setEssayWatchStatus(`Дальше «${essayNextName}» через ${m}:${String(s).padStart(2, '0')}.`)
+    }
+
+    // Кнопка блока отправляет его сейчас и ставит в очередь следующие блоки с паузой.
+    // Повторное нажатие любой кнопки перезапускает расписание с этого блока.
+    function sendEssayBlock(index) {
+      const blocks = essayBlockList()
+      if (!blocks.length) { setEssayWatchStatus('Сначала найди сочинение.', true); return }
+      if (!('Notification' in window) || Notification.permission !== 'granted') {
+        setEssayWatchStatus('Разреши уведомления в настройках, чтобы отправить сочинение на часы.', true)
+        return
+      }
+      stopEssayWatch()
+      stopTaskQueue()
+      stopHalves()
+      stopCustomSend()
+      essayWatch = { blocks }
+      essayWatchOwner = {}
+      document.getElementById('essayStopBtn').disabled = false
+      holdEssayWatchLock()
+      essayPlay(Math.min(Math.max(Number(index) || 0, 0), blocks.length - 1))
+    }
+
+    // Таймер в фоне может не сработать вовремя: после возврата на страницу пересобираем
+    // ожидание от сохранённого времени, чтобы часть не потерялась и не пришла дважды.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible' || !essayWatch) return
+      essayWatchWake = null
+      holdEssayWatchLock()
+      if (essayNextFire && essayNextAt) {
+        if (essayWatchTimer !== null) clearTimeout(essayWatchTimer)
+        essayWatchTimer = setTimeout(runEssayNext, Math.max(0, essayNextAt - Date.now()))
+      }
+    })
+
   </script>
 
 
